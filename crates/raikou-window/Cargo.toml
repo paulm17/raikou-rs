@@ -1,0 +1,17 @@
+[package]
+name = "raikou-window"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+accesskit.workspace = true
+accesskit_winit.workspace = true
+raikou-core.workspace = true
+raw-window-handle.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+winit.workspace = true

@@ -1,0 +1,12 @@
+[package]
+name = "raikou-text"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+raikou-core.workspace = true
+cosmic-text.workspace = true
+unicode-segmentation.workspace = true

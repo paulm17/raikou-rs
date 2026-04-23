@@ -1,0 +1,49 @@
+[workspace]
+members = [
+    "crates/raikou-core",
+    "crates/raikou-window",
+    "crates/raikou-skia",
+    "crates/raikou-text",
+    "crates/raikou-layout",
+]
+
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+
+[workspace.dependencies]
+accesskit = "0.17"
+accesskit_winit = "0.23"
+raw-window-handle = "0.6.2"
+thiserror = "2.0.18"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt"] }
+winit = "0.30.13"
+skia-safe = { version = "0.93.1", features = ["metal", "textlayout", "svg"] }
+cosmic-text = { version = "0.18.2", features = ["swash", "warn_on_missing_glyphs"] }
+swash = "0.2" 
+unicode-segmentation = "1.12.0"
+raikou-core = { path = "crates/raikou-core" }
+raikou-window = { path = "crates/raikou-window" }
+raikou-skia = { path = "crates/raikou-skia" }
+raikou-text = { path = "crates/raikou-text" }
+raikou-layout = { path = "crates/raikou-layout" }
+
+[package]
+name = "raikou-rs"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+raikou-core = { path = "crates/raikou-core" }
+raikou-skia = { path = "crates/raikou-skia" }
+raikou-text = { path = "crates/raikou-text" }
+raikou-window = { path = "crates/raikou-window" }
+raikou-layout = { path = "crates/raikou-layout" }
+skia-safe = { workspace = true }
+swash.workspace = true
+cosmic-text.workspace = true
