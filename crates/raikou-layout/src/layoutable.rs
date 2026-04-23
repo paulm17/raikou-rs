@@ -1,11 +1,14 @@
 use std::any::Any;
+use std::sync::Arc;
 
 use raikou_core::{PaintLayer, Point, Rect, Size, Thickness, WidgetId};
+use raikou_text::FontSystem;
 
 use crate::alignment::{HorizontalAlignment, VerticalAlignment};
 use crate::attached::AttachedLayout;
 use crate::constraints::LayoutConstraints;
 use crate::rounding::{round_rect, round_size, round_value};
+use crate::text_measure_cache::TextMeasureCache;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum Visibility {
@@ -14,7 +17,21 @@ pub enum Visibility {
     Collapsed,
 }
 
-#[derive(Clone, Debug)]
+pub struct LayoutContext<'a> {
+    pub font_system: &'a mut FontSystem,
+    pub text_measure_cache: TextMeasureCache,
+}
+
+impl<'a> LayoutContext<'a> {
+    pub fn new(font_system: &'a mut FontSystem) -> Self {
+        Self {
+            font_system,
+            text_measure_cache: TextMeasureCache::new(),
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct Layoutable {
     id: WidgetId,
     pub(crate) desired_size: Size,
@@ -32,7 +49,36 @@ pub struct Layoutable {
     pub vertical_alignment: VerticalAlignment,
     pub use_layout_rounding: bool,
     pub visibility: Visibility,
-    pub attached: AttachedLayout,
+    pub     attached: AttachedLayout,
+    overlay_layer: Option<PaintLayer>,
+    parent_id: Option<WidgetId>,
+    invalidation_cb: Option<Arc<dyn Fn(WidgetId, bool)>>,
+}
+
+impl std::fmt::Debug for Layoutable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Layoutable")
+            .field("id", &self.id)
+            .field("desired_size", &self.desired_size)
+            .field("bounds", &self.bounds)
+            .field("layout_slot", &self.layout_slot)
+            .field("previous_measure", &self.previous_measure)
+            .field("previous_arrange", &self.previous_arrange)
+            .field("measure_valid", &self.measure_valid)
+            .field("arrange_valid", &self.arrange_valid)
+            .field("width", &self.width)
+            .field("height", &self.height)
+            .field("constraints", &self.constraints)
+            .field("margin", &self.margin)
+            .field("horizontal_alignment", &self.horizontal_alignment)
+            .field("vertical_alignment", &self.vertical_alignment)
+            .field("use_layout_rounding", &self.use_layout_rounding)
+            .field("visibility", &self.visibility)
+            .field("attached", &self.attached)
+            .field("overlay_layer", &self.overlay_layer)
+            .field("parent_id", &self.parent_id)
+            .finish_non_exhaustive()
+    }
 }
 
 impl Default for Layoutable {
@@ -55,6 +101,9 @@ impl Default for Layoutable {
             use_layout_rounding: true,
             visibility: Visibility::Visible,
             attached: AttachedLayout::default(),
+            overlay_layer: None,
+            parent_id: None,
+            invalidation_cb: None,
         }
     }
 }
@@ -88,13 +137,43 @@ impl Layoutable {
         self.arrange_valid
     }
 
+    pub fn parent_id(&self) -> Option<WidgetId> {
+        self.parent_id
+    }
+
+    pub fn set_parent_id(&mut self, parent_id: Option<WidgetId>) {
+        self.parent_id = parent_id;
+    }
+
+    pub fn set_invalidation_callback(&mut self, cb: Option<Arc<dyn Fn(WidgetId, bool)>>) {
+        self.invalidation_cb = cb;
+    }
+
+    pub fn clear_invalidation_callback(&mut self) {
+        self.invalidation_cb = None;
+    }
+
+    pub fn paint_layer(&self) -> PaintLayer {
+        self.overlay_layer.unwrap_or(PaintLayer::Content)
+    }
+
+    pub fn set_overlay_layer(&mut self, layer: PaintLayer) {
+        self.overlay_layer = Some(layer);
+    }
+
     pub fn invalidate_measure(&mut self) {
         self.measure_valid = false;
         self.arrange_valid = false;
+        if let Some(ref cb) = self.invalidation_cb {
+            cb(self.id, true);
+        }
     }
 
     pub fn invalidate_arrange(&mut self) {
         self.arrange_valid = false;
+        if let Some(ref cb) = self.invalidation_cb {
+            cb(self.id, false);
+        }
     }
 }
 
@@ -103,14 +182,14 @@ pub trait LayoutElement {
     fn as_any_mut(&mut self) -> &mut dyn Any;
     fn layout(&self) -> &Layoutable;
     fn layout_mut(&mut self) -> &mut Layoutable;
-    fn measure_override(&mut self, available: Size) -> Size;
-    fn arrange_override(&mut self, final_size: Size) -> Size;
+    fn measure_override(&mut self, ctx: &mut LayoutContext, available: Size) -> Size;
+    fn arrange_override(&mut self, ctx: &mut LayoutContext, final_size: Size) -> Size;
 
     fn visit_children(&self, visitor: &mut dyn FnMut(&dyn LayoutElement));
     fn visit_children_mut(&mut self, visitor: &mut dyn FnMut(&mut dyn LayoutElement));
 
     fn paint_layer(&self) -> PaintLayer {
-        PaintLayer::Content
+        self.layout().paint_layer()
     }
 }
 
@@ -155,14 +234,14 @@ impl LayoutElement for SizedBox {
         &mut self.layout
     }
 
-    fn measure_override(&mut self, available: Size) -> Size {
+    fn measure_override(&mut self, _ctx: &mut LayoutContext, available: Size) -> Size {
         Size::new(
             self.intrinsic_size.width.min(available.width),
             self.intrinsic_size.height.min(available.height),
         )
     }
 
-    fn arrange_override(&mut self, final_size: Size) -> Size {
+    fn arrange_override(&mut self, _ctx: &mut LayoutContext, final_size: Size) -> Size {
         final_size
     }
 
@@ -171,7 +250,7 @@ impl LayoutElement for SizedBox {
     fn visit_children_mut(&mut self, _visitor: &mut dyn FnMut(&mut dyn LayoutElement)) {}
 }
 
-pub fn measure_element(element: &mut dyn LayoutElement, available: Size) -> Size {
+pub fn measure_element(element: &mut dyn LayoutElement, ctx: &mut LayoutContext, available: Size) -> Size {
     let available = sanitize_size(available);
     if element.layout().measure_valid
         && element.layout().previous_measure == Some(available)
@@ -210,7 +289,7 @@ pub fn measure_element(element: &mut dyn LayoutElement, available: Size) -> Size
             .min(inner_available.height),
     );
 
-    let measured = element.measure_override(constraints.constrain(override_available));
+    let measured = element.measure_override(ctx, constraints.constrain(override_available));
     let explicit = Size::new(
         width.unwrap_or(measured.width),
         height.unwrap_or(measured.height),
@@ -233,7 +312,7 @@ pub fn measure_element(element: &mut dyn LayoutElement, available: Size) -> Size
     desired
 }
 
-pub fn arrange_element(element: &mut dyn LayoutElement, final_rect: Rect) {
+pub fn arrange_element(element: &mut dyn LayoutElement, ctx: &mut LayoutContext, final_rect: Rect) {
     let final_rect = sanitize_rect(final_rect);
     if element.layout().arrange_valid
         && element.layout().previous_arrange == Some(final_rect)
@@ -321,7 +400,7 @@ pub fn arrange_element(element: &mut dyn LayoutElement, final_rect: Rect) {
         arranged_rect = round_rect(arranged_rect);
     }
 
-    let arranged_size = element.arrange_override(arranged_rect.size);
+    let arranged_size = element.arrange_override(ctx, arranged_rect.size);
     let bounds = Rect::new(arranged_rect.origin, arranged_size);
     let layout = element.layout_mut();
     layout.layout_slot = final_rect;

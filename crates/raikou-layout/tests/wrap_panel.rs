@@ -1,8 +1,10 @@
 use raikou_core::{Rect, Size};
-use raikou_layout::{Orientation, SizedBox, WrapPanel, arrange_element, measure_element};
+use raikou_layout::{LayoutContext, Orientation, SizedBox, WrapPanel, arrange_element, measure_element};
 
 #[test]
 fn avalonia_wrap_panel_wraps_items_and_tracks_line_height() {
+    let mut font_system = raikou_layout::FontSystem::new();
+    let mut ctx = LayoutContext::new(&mut font_system);
     let mut panel = WrapPanel::new();
     panel.item_spacing = 5.0;
     panel.line_spacing = 2.0;
@@ -11,10 +13,10 @@ fn avalonia_wrap_panel_wraps_items_and_tracks_line_height() {
     panel.push_child(Box::new(SizedBox::new(Size::new(30.0, 15.0))));
 
     assert_eq!(
-        measure_element(&mut panel, Size::new(70.0, 100.0)),
+        measure_element(&mut panel, &mut ctx, Size::new(70.0, 100.0)),
         Size::new(65.0, 37.0)
     );
-    arrange_element(&mut panel, Rect::from_xywh(0.0, 0.0, 70.0, 37.0));
+    arrange_element(&mut panel, &mut ctx, Rect::from_xywh(0.0, 0.0, 70.0, 37.0));
 
     assert_eq!(
         panel.children()[0].layout().bounds(),
@@ -32,6 +34,8 @@ fn avalonia_wrap_panel_wraps_items_and_tracks_line_height() {
 
 #[test]
 fn avalonia_wrap_panel_vertical_orientation_wraps_by_height() {
+    let mut font_system = raikou_layout::FontSystem::new();
+    let mut ctx = LayoutContext::new(&mut font_system);
     let mut panel = WrapPanel::new();
     panel.orientation = Orientation::Vertical;
     panel.item_spacing = 3.0;
@@ -41,10 +45,10 @@ fn avalonia_wrap_panel_vertical_orientation_wraps_by_height() {
     panel.push_child(Box::new(SizedBox::new(Size::new(12.0, 20.0))));
 
     assert_eq!(
-        measure_element(&mut panel, Size::new(100.0, 45.0)),
+        measure_element(&mut panel, &mut ctx, Size::new(100.0, 45.0)),
         Size::new(31.0, 43.0)
     );
-    arrange_element(&mut panel, Rect::from_xywh(0.0, 0.0, 31.0, 45.0));
+    arrange_element(&mut panel, &mut ctx, Rect::from_xywh(0.0, 0.0, 31.0, 45.0));
 
     assert_eq!(
         panel.children()[0].layout().bounds(),

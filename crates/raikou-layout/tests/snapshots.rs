@@ -1,9 +1,9 @@
 mod support;
 
-use raikou_core::{Color, Rect, RoundedRect, Size};
+use raikou_core::{Color, PaintLayer, Rect, RoundedRect, Size};
 use raikou_layout::{
-    Canvas, ColumnDefinition, Dock, DockPanel, Grid, LayoutElement, OverlayLayer, RowDefinition,
-    SizedBox, StackPanel, WrapPanel, arrange_element, measure_element,
+    Canvas, ColumnDefinition, Dock, DockPanel, Grid, LayoutContext, LayoutElement, OverlayLayer,
+    RowDefinition, SizedBox, StackPanel, WrapPanel, arrange_element, measure_element,
 };
 use raikou_skia::Painter;
 use skia_safe::surfaces;
@@ -39,6 +39,12 @@ fn overlay_layer_snapshot_matches() {
 }
 
 #[test]
+fn paint_layer_consumption_snapshot_matches() {
+    let mut surface = render_paint_layer_surface();
+    support::assert_surface_snapshot(&mut surface, "paint_layer_consumption.png");
+}
+
+#[test]
 #[ignore]
 fn regenerate_layout_snapshots() {
     let mut stack = render_stack_panel_surface();
@@ -51,6 +57,8 @@ fn regenerate_layout_snapshots() {
     support::write_surface_snapshot(&mut grid, "grid.png");
     let mut overlay = render_overlay_surface();
     support::write_surface_snapshot(&mut overlay, "overlay_layer.png");
+    let mut paint_layer = render_paint_layer_surface();
+    support::write_surface_snapshot(&mut paint_layer, "paint_layer_consumption.png");
 }
 
 fn render_stack_panel_surface() -> skia_safe::Surface {
@@ -141,12 +149,14 @@ fn render_overlay_surface() -> skia_safe::Surface {
     let painter = Painter::new(surface.canvas());
     painter.clear(Color::new(1.0, 1.0, 1.0, 1.0));
 
-    measure_element(&mut content, Size::new(180.0, 120.0));
-    arrange_element(&mut content, Rect::from_xywh(0.0, 0.0, 180.0, 120.0));
+    let mut font_system = raikou_layout::FontSystem::new();
+    let mut ctx = LayoutContext::new(&mut font_system);
+    measure_element(&mut content, &mut ctx, Size::new(180.0, 120.0));
+    arrange_element(&mut content, &mut ctx, Rect::from_xywh(0.0, 0.0, 180.0, 120.0));
     paint_canvas_like(&painter, &content, Color::new(0.3, 0.6, 0.9, 1.0));
 
-    measure_element(&mut overlay, Size::new(180.0, 120.0));
-    arrange_element(&mut overlay, Rect::from_xywh(0.0, 0.0, 180.0, 120.0));
+    measure_element(&mut overlay, &mut ctx, Size::new(180.0, 120.0));
+    arrange_element(&mut overlay, &mut ctx, Rect::from_xywh(0.0, 0.0, 180.0, 120.0));
     paint_overlay(&painter, &overlay, Color::new(0.95, 0.45, 0.2, 0.95));
     surface
 }
@@ -161,9 +171,12 @@ fn render_panel(
     let painter = Painter::new(surface.canvas());
     painter.clear(Color::new(1.0, 1.0, 1.0, 1.0));
 
-    measure_element(panel, available);
+    let mut font_system = raikou_layout::FontSystem::new();
+    let mut ctx = LayoutContext::new(&mut font_system);
+    measure_element(panel, &mut ctx, available);
     arrange_element(
         panel,
+        &mut ctx,
         Rect::from_xywh(0.0, 0.0, available.width, available.height),
     );
     paint_rect_tree(&painter, panel);
@@ -204,4 +217,55 @@ fn paint_overlay(painter: &Painter<'_>, overlay: &OverlayLayer, color: Color) {
             color,
         );
     });
+}
+
+fn render_paint_layer_surface() -> skia_safe::Surface {
+    let mut root = Canvas::new();
+
+    let mut content = SizedBox::new(Size::new(80.0, 50.0));
+    content.layout_mut().attached.canvas.left = Some(10.0);
+    content.layout_mut().attached.canvas.top = Some(10.0);
+    root.push_child(Box::new(content));
+
+    let mut overlay = SizedBox::new(Size::new(60.0, 40.0));
+    overlay
+        .layout_mut()
+        .set_overlay_layer(PaintLayer::Overlay(raikou_core::OverlayPaintPhase::AfterContent));
+    overlay.layout_mut().attached.canvas.left = Some(20.0);
+    overlay.layout_mut().attached.canvas.top = Some(15.0);
+    root.push_child(Box::new(overlay));
+
+    let size = Size::new(100.0, 100.0);
+    let mut font_system = raikou_layout::FontSystem::new();
+    let mut ctx = LayoutContext::new(&mut font_system);
+    measure_element(&mut root, &mut ctx, size);
+    arrange_element(&mut root, &mut ctx, Rect::from_xywh(0.0, 0.0, size.width, size.height));
+
+    let mut surface = skia_safe::surfaces::raster_n32_premul((100, 100)).expect("surface");
+    let painter = Painter::new(surface.canvas());
+    painter.clear(Color::new(1.0, 1.0, 1.0, 1.0));
+
+    let commands = raikou_layout::collect_paint_commands(&root);
+    let palette = [
+        Color::new(0.2, 0.47, 0.82, 1.0),
+        Color::new(0.95, 0.45, 0.2, 1.0),
+    ];
+
+    for cmd in commands {
+        let bounds = cmd.element.layout().bounds();
+        let abs_rect = Rect::from_xywh(
+            cmd.absolute_position.x,
+            cmd.absolute_position.y,
+            bounds.size.width,
+            bounds.size.height,
+        );
+        let color = if matches!(cmd.layer, PaintLayer::Overlay(_)) {
+            palette[1]
+        } else {
+            palette[0]
+        };
+        painter.fill_rounded_rect(RoundedRect::from_rect_xy(abs_rect, 4.0), color);
+    }
+
+    surface
 }

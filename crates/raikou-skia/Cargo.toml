@@ -8,6 +8,7 @@ path = "src/lib.rs"
 
 [dependencies]
 raikou-core.workspace = true
+raikou-text.workspace = true
 raw-window-handle.workspace = true
 skia-safe.workspace = true
 thiserror.workspace = true

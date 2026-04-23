@@ -3,7 +3,7 @@ use std::any::Any;
 use raikou_core::{Rect, Size};
 
 use crate::attached::GridPlacement;
-use crate::layoutable::{LayoutElement, Layoutable, arrange_element, measure_element};
+use crate::layoutable::{LayoutContext, LayoutElement, Layoutable, arrange_element, measure_element};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum GridLength {
@@ -83,7 +83,8 @@ impl Grid {
         }
     }
 
-    pub fn push_child(&mut self, child: Box<dyn LayoutElement>) {
+    pub fn push_child(&mut self, mut child: Box<dyn LayoutElement>) {
+        child.layout_mut().set_parent_id(Some(self.layout.id()));
         self.children.push(child);
         self.layout.invalidate_measure();
     }
@@ -139,7 +140,7 @@ impl LayoutElement for Grid {
         &mut self.layout
     }
 
-    fn measure_override(&mut self, available: Size) -> Size {
+    fn measure_override(&mut self, ctx: &mut LayoutContext, available: Size) -> Size {
         let column_count = self.effective_columns();
         let row_count = self.effective_rows();
         let mut column_sizes = vec![0.0; column_count];
@@ -171,7 +172,7 @@ impl LayoutElement for Grid {
                     f32::INFINITY
                 },
             );
-            let child_size = measure_element(child.as_mut(), child_available);
+            let child_size = measure_element(child.as_mut(), ctx, child_available);
             let placement = Self::placement(child.layout().attached.grid, column_count, row_count);
 
             for column in
@@ -262,7 +263,7 @@ impl LayoutElement for Grid {
         )
     }
 
-    fn arrange_override(&mut self, final_size: Size) -> Size {
+    fn arrange_override(&mut self, ctx: &mut LayoutContext, final_size: Size) -> Size {
         let column_count = self.effective_columns();
         let row_count = self.effective_rows();
         let mut column_sizes = vec![0.0; column_count];
@@ -364,6 +365,7 @@ impl LayoutElement for Grid {
                 + self.row_spacing * placement.row_span.saturating_sub(1) as f32;
             arrange_element(
                 child.as_mut(),
+                ctx,
                 Rect::from_xywh(
                     column_offsets[placement.column],
                     row_offsets[placement.row],

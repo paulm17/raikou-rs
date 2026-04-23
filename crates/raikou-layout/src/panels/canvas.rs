@@ -2,7 +2,7 @@ use std::any::Any;
 
 use raikou_core::{Rect, Size};
 
-use crate::layoutable::{LayoutElement, Layoutable, arrange_element, measure_element};
+use crate::layoutable::{LayoutContext, LayoutElement, Layoutable, arrange_element, measure_element};
 
 pub struct Canvas {
     layout: Layoutable,
@@ -17,7 +17,8 @@ impl Canvas {
         }
     }
 
-    pub fn push_child(&mut self, child: Box<dyn LayoutElement>) {
+    pub fn push_child(&mut self, mut child: Box<dyn LayoutElement>) {
+        child.layout_mut().set_parent_id(Some(self.layout.id()));
         self.children.push(child);
         self.layout.invalidate_measure();
     }
@@ -56,14 +57,14 @@ impl LayoutElement for Canvas {
         &mut self.layout
     }
 
-    fn measure_override(&mut self, _available: Size) -> Size {
+    fn measure_override(&mut self, ctx: &mut LayoutContext, _available: Size) -> Size {
         for child in &mut self.children {
-            measure_element(child.as_mut(), Size::new(f32::INFINITY, f32::INFINITY));
+            measure_element(child.as_mut(), ctx, Size::new(f32::INFINITY, f32::INFINITY));
         }
         Size::ZERO
     }
 
-    fn arrange_override(&mut self, final_size: Size) -> Size {
+    fn arrange_override(&mut self, ctx: &mut LayoutContext, final_size: Size) -> Size {
         for child in &mut self.children {
             let desired = child.layout().desired_size();
             let canvas = child.layout().attached.canvas;
@@ -83,6 +84,7 @@ impl LayoutElement for Canvas {
             };
             arrange_element(
                 child.as_mut(),
+                ctx,
                 Rect::from_xywh(x, y, desired.width, desired.height),
             );
         }

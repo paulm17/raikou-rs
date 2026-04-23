@@ -1,8 +1,10 @@
 use raikou_core::{Rect, Size};
-use raikou_layout::{Canvas, LayoutElement, SizedBox, arrange_element, measure_element};
+use raikou_layout::{Canvas, LayoutContext, LayoutElement, SizedBox, arrange_element, measure_element};
 
 #[test]
 fn avalonia_canvas_honors_attached_left_top_and_right_bottom() {
+    let mut font_system = raikou_layout::FontSystem::new();
+    let mut ctx = LayoutContext::new(&mut font_system);
     let mut a = SizedBox::new(Size::new(20.0, 10.0));
     a.layout_mut().attached.canvas.left = Some(5.0);
     a.layout_mut().attached.canvas.top = Some(7.0);
@@ -16,10 +18,10 @@ fn avalonia_canvas_honors_attached_left_top_and_right_bottom() {
     canvas.push_child(Box::new(b));
 
     assert_eq!(
-        measure_element(&mut canvas, Size::new(100.0, 100.0)),
+        measure_element(&mut canvas, &mut ctx, Size::new(100.0, 100.0)),
         Size::ZERO
     );
-    arrange_element(&mut canvas, Rect::from_xywh(0.0, 0.0, 100.0, 60.0));
+    arrange_element(&mut canvas, &mut ctx, Rect::from_xywh(0.0, 0.0, 100.0, 60.0));
 
     assert_eq!(
         canvas.children()[0].layout().bounds(),

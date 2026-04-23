@@ -3,7 +3,7 @@ use std::any::Any;
 use raikou_core::{Rect, Size};
 
 use crate::attached::Dock;
-use crate::layoutable::{LayoutElement, Layoutable, Visibility, arrange_element, measure_element};
+use crate::layoutable::{LayoutContext, LayoutElement, Layoutable, Visibility, arrange_element, measure_element};
 
 pub struct DockPanel {
     layout: Layoutable,
@@ -24,7 +24,8 @@ impl DockPanel {
         }
     }
 
-    pub fn push_child(&mut self, child: Box<dyn LayoutElement>) {
+    pub fn push_child(&mut self, mut child: Box<dyn LayoutElement>) {
+        child.layout_mut().set_parent_id(Some(self.layout.id()));
         self.children.push(child);
         self.layout.invalidate_measure();
     }
@@ -63,7 +64,7 @@ impl LayoutElement for DockPanel {
         &mut self.layout
     }
 
-    fn measure_override(&mut self, available: Size) -> Size {
+    fn measure_override(&mut self, ctx: &mut LayoutContext, available: Size) -> Size {
         let measure_count = if self.last_child_fill && !self.children.is_empty() {
             self.children.len() - 1
         } else {
@@ -82,7 +83,7 @@ impl LayoutElement for DockPanel {
                 (available.width - accumulated_width).max(0.0),
                 (available.height - accumulated_height).max(0.0),
             );
-            let child_size = measure_element(child.as_mut(), child_constraint);
+            let child_size = measure_element(child.as_mut(), ctx, child_constraint);
             match child.layout().attached.dock {
                 Dock::Left | Dock::Right => {
                     parent_height = parent_height.max(accumulated_height + child_size.height);
@@ -109,7 +110,7 @@ impl LayoutElement for DockPanel {
                     (available.width - accumulated_width).max(0.0),
                     (available.height - accumulated_height).max(0.0),
                 );
-                let child_size = measure_element(child.as_mut(), child_constraint);
+                let child_size = measure_element(child.as_mut(), ctx, child_constraint);
                 parent_width = parent_width.max(accumulated_width + child_size.width);
                 parent_height = parent_height.max(accumulated_height + child_size.height);
                 accumulated_width += child_size.width;
@@ -130,7 +131,7 @@ impl LayoutElement for DockPanel {
         )
     }
 
-    fn arrange_override(&mut self, final_size: Size) -> Size {
+    fn arrange_override(&mut self, ctx: &mut LayoutContext, final_size: Size) -> Size {
         let mut bounds = Rect::from_xywh(0.0, 0.0, final_size.width, final_size.height);
         let arrange_count = if self.last_child_fill && !self.children.is_empty() {
             self.children.len() - 1
@@ -149,6 +150,7 @@ impl LayoutElement for DockPanel {
                     let width = desired.width.min(bounds.size.width);
                     arrange_element(
                         child.as_mut(),
+                        ctx,
                         Rect::from_xywh(
                             bounds.origin.x,
                             bounds.origin.y,
@@ -164,6 +166,7 @@ impl LayoutElement for DockPanel {
                     let width = desired.width.min(bounds.size.width);
                     arrange_element(
                         child.as_mut(),
+                        ctx,
                         Rect::from_xywh(
                             bounds.origin.x + bounds.size.width - width,
                             bounds.origin.y,
@@ -178,6 +181,7 @@ impl LayoutElement for DockPanel {
                     let height = desired.height.min(bounds.size.height);
                     arrange_element(
                         child.as_mut(),
+                        ctx,
                         Rect::from_xywh(
                             bounds.origin.x,
                             bounds.origin.y,
@@ -193,6 +197,7 @@ impl LayoutElement for DockPanel {
                     let height = desired.height.min(bounds.size.height);
                     arrange_element(
                         child.as_mut(),
+                        ctx,
                         Rect::from_xywh(
                             bounds.origin.x,
                             bounds.origin.y + bounds.size.height - height,
@@ -208,7 +213,7 @@ impl LayoutElement for DockPanel {
 
         if self.last_child_fill {
             if let Some(child) = self.children.last_mut() {
-                arrange_element(child.as_mut(), bounds);
+                arrange_element(child.as_mut(), ctx, bounds);
             }
         }
 

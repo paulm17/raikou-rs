@@ -3,7 +3,7 @@ use std::any::Any;
 use raikou_core::{Rect, Size};
 
 use crate::alignment::Orientation;
-use crate::layoutable::{LayoutElement, Layoutable, Visibility, arrange_element, measure_element};
+use crate::layoutable::{LayoutContext, LayoutElement, Layoutable, Visibility, arrange_element, measure_element};
 
 pub struct StackPanel {
     layout: Layoutable,
@@ -22,7 +22,8 @@ impl StackPanel {
         }
     }
 
-    pub fn push_child(&mut self, child: Box<dyn LayoutElement>) {
+    pub fn push_child(&mut self, mut child: Box<dyn LayoutElement>) {
+        child.layout_mut().set_parent_id(Some(self.layout.id()));
         self.children.push(child);
         self.layout.invalidate_measure();
     }
@@ -65,7 +66,7 @@ impl LayoutElement for StackPanel {
         &mut self.layout
     }
 
-    fn measure_override(&mut self, available: Size) -> Size {
+    fn measure_override(&mut self, ctx: &mut LayoutContext, available: Size) -> Size {
         let mut desired = Size::ZERO;
         let mut visible_count = 0usize;
 
@@ -74,7 +75,7 @@ impl LayoutElement for StackPanel {
                 Orientation::Vertical => Size::new(available.width, f32::INFINITY),
                 Orientation::Horizontal => Size::new(f32::INFINITY, available.height),
             };
-            let child_size = measure_element(child.as_mut(), child_available);
+            let child_size = measure_element(child.as_mut(), ctx, child_available);
             if child.layout().visibility == Visibility::Collapsed {
                 continue;
             }
@@ -103,13 +104,13 @@ impl LayoutElement for StackPanel {
         desired
     }
 
-    fn arrange_override(&mut self, final_size: Size) -> Size {
+    fn arrange_override(&mut self, ctx: &mut LayoutContext, final_size: Size) -> Size {
         let mut offset = 0.0;
         let mut placed_any = false;
 
         for child in &mut self.children {
             if child.layout().visibility == Visibility::Collapsed {
-                arrange_element(child.as_mut(), Rect::from_xywh(0.0, 0.0, 0.0, 0.0));
+                arrange_element(child.as_mut(), ctx, Rect::from_xywh(0.0, 0.0, 0.0, 0.0));
                 continue;
             }
 
@@ -133,7 +134,7 @@ impl LayoutElement for StackPanel {
                 }
             };
 
-            arrange_element(child.as_mut(), rect);
+            arrange_element(child.as_mut(), ctx, rect);
             placed_any = true;
         }
 

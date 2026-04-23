@@ -1880,6 +1880,7 @@ version = "0.1.0"
 dependencies = [
  "raikou-core",
  "raikou-skia",
+ "raikou-text",
  "skia-safe",
  "tracing",
 ]
@@ -1908,6 +1909,7 @@ dependencies = [
  "objc2-metal 0.3.2",
  "objc2-quartz-core 0.3.2",
  "raikou-core",
+ "raikou-text",
  "raw-window-handle",
  "skia-safe",
  "thiserror 2.0.18",
@@ -1922,6 +1924,18 @@ dependencies = [
  "cosmic-text",
  "raikou-core",
  "unicode-segmentation",
+]
+
+[[package]]
+name = "raikou-widgets"
+version = "0.1.0"
+dependencies = [
+ "raikou-core",
+ "raikou-layout",
+ "raikou-skia",
+ "raikou-text",
+ "raikou-window",
+ "skia-safe",
 ]
 
 [[package]]

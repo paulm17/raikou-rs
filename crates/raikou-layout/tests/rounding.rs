@@ -1,14 +1,16 @@
 use raikou_core::{Rect, Size};
-use raikou_layout::{LayoutElement, SizedBox, arrange_element, measure_element};
+use raikou_layout::{LayoutContext, LayoutElement, SizedBox, arrange_element, measure_element};
 
 #[test]
 fn layout_rounding_stabilizes_fractional_bounds() {
+    let mut font_system = raikou_layout::FontSystem::new();
+    let mut ctx = LayoutContext::new(&mut font_system);
     let mut node = SizedBox::new(Size::new(10.4, 10.4));
-    measure_element(&mut node, Size::new(50.5, 50.5));
-    arrange_element(&mut node, Rect::from_xywh(0.4, 0.6, 10.4, 10.4));
+    measure_element(&mut node, &mut ctx, Size::new(50.5, 50.5));
+    arrange_element(&mut node, &mut ctx, Rect::from_xywh(0.4, 0.6, 10.4, 10.4));
     let first = node.layout().bounds();
 
-    arrange_element(&mut node, Rect::from_xywh(0.4, 0.6, 10.4, 10.4));
+    arrange_element(&mut node, &mut ctx, Rect::from_xywh(0.4, 0.6, 10.4, 10.4));
     let second = node.layout().bounds();
 
     assert_eq!(first, second);
@@ -17,11 +19,13 @@ fn layout_rounding_stabilizes_fractional_bounds() {
 
 #[test]
 fn layout_rounding_rounds_margins_in_final_arrangement() {
+    let mut font_system = raikou_layout::FontSystem::new();
+    let mut ctx = LayoutContext::new(&mut font_system);
     let mut node = SizedBox::new(Size::new(8.2, 8.2));
     node.layout_mut().margin = raikou_core::Thickness::new(0.6, 0.6, 0.6, 0.6);
 
-    measure_element(&mut node, Size::new(20.0, 20.0));
-    arrange_element(&mut node, Rect::from_xywh(0.0, 0.0, 20.0, 20.0));
+    measure_element(&mut node, &mut ctx, Size::new(20.0, 20.0));
+    arrange_element(&mut node, &mut ctx, Rect::from_xywh(0.0, 0.0, 20.0, 20.0));
 
     assert_eq!(
         node.layout().bounds(),

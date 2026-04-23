@@ -4,6 +4,7 @@ pub mod frame;
 pub mod image;
 pub mod painter;
 pub mod surface;
+pub mod text;
 
 pub use backend::{BackendKind, BackendSelection};
 pub use error::{FrameError, ImageError, RendererError, SurfaceError};

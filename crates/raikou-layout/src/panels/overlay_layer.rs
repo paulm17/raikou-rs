@@ -2,7 +2,7 @@ use std::any::Any;
 
 use raikou_core::{OverlayPaintPhase, PaintLayer, Rect, Size};
 
-use crate::layoutable::{LayoutElement, Layoutable, arrange_element, measure_element};
+use crate::layoutable::{LayoutContext, LayoutElement, Layoutable, arrange_element, measure_element};
 
 pub struct OverlayLayer {
     layout: Layoutable,
@@ -19,7 +19,8 @@ impl OverlayLayer {
         }
     }
 
-    pub fn push_child(&mut self, child: Box<dyn LayoutElement>) {
+    pub fn push_child(&mut self, mut child: Box<dyn LayoutElement>) {
+        child.layout_mut().set_parent_id(Some(self.layout.id()));
         self.children.push(child);
         self.layout.invalidate_measure();
     }
@@ -58,19 +59,20 @@ impl LayoutElement for OverlayLayer {
         &mut self.layout
     }
 
-    fn measure_override(&mut self, available: Size) -> Size {
+    fn measure_override(&mut self, ctx: &mut LayoutContext, available: Size) -> Size {
         for child in &mut self.children {
-            measure_element(child.as_mut(), available);
+            measure_element(child.as_mut(), ctx, available);
         }
         available
     }
 
-    fn arrange_override(&mut self, final_size: Size) -> Size {
+    fn arrange_override(&mut self, ctx: &mut LayoutContext, final_size: Size) -> Size {
         self.available_size = final_size;
         for child in &mut self.children {
             let desired = child.layout().desired_size();
             arrange_element(
                 child.as_mut(),
+                ctx,
                 Rect::from_xywh(0.0, 0.0, desired.width, desired.height),
             );
         }

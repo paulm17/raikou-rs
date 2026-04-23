@@ -1,8 +1,8 @@
 use std::any::Any;
 
-use raikou_core::{Color, Rect, Size};
+use raikou_core::{Color, Size};
 
-use crate::layoutable::{LayoutElement, Layoutable, arrange_element, measure_element};
+use crate::layoutable::{LayoutContext, LayoutElement, Layoutable, measure_element};
 
 pub struct Panel {
     layout: Layoutable,
@@ -19,7 +19,8 @@ impl Panel {
         }
     }
 
-    pub fn push_child(&mut self, child: Box<dyn LayoutElement>) {
+    pub fn push_child(&mut self, mut child: Box<dyn LayoutElement>) {
+        child.layout_mut().set_parent_id(Some(self.layout.id()));
         self.children.push(child);
         self.layout.invalidate_measure();
     }
@@ -70,21 +71,22 @@ impl LayoutElement for Panel {
         &mut self.layout
     }
 
-    fn measure_override(&mut self, available: Size) -> Size {
+    fn measure_override(&mut self, ctx: &mut LayoutContext, available: Size) -> Size {
         let mut desired = Size::ZERO;
         for child in &mut self.children {
-            let child_size = measure_element(child.as_mut(), available);
+            let child_size = measure_element(child.as_mut(), ctx, available);
             desired.width = desired.width.max(child_size.width);
             desired.height = desired.height.max(child_size.height);
         }
         desired
     }
 
-    fn arrange_override(&mut self, final_size: Size) -> Size {
-        for child in &mut self.children {
-            arrange_element(
-                child.as_mut(),
-                Rect::from_xywh(0.0, 0.0, final_size.width, final_size.height),
+    fn arrange_override(&mut self, _ctx: &mut LayoutContext, final_size: Size) -> Size {
+        if !self.children.is_empty() {
+            panic!(
+                "Panel::arrange_override is unimplemented. \
+                 Panel is an abstract base class for custom panels. \
+                 Use a concrete panel such as StackPanel, DockPanel, Grid, WrapPanel, or Canvas."
             );
         }
         final_size

@@ -3,7 +3,7 @@ use std::any::Any;
 use raikou_core::{Rect, Size};
 
 use crate::alignment::{Orientation, WrapItemsAlignment};
-use crate::layoutable::{LayoutElement, Layoutable, Visibility, arrange_element, measure_element};
+use crate::layoutable::{LayoutContext, LayoutElement, Layoutable, Visibility, arrange_element, measure_element};
 
 pub struct WrapPanel {
     layout: Layoutable,
@@ -37,7 +37,8 @@ impl WrapPanel {
         }
     }
 
-    pub fn push_child(&mut self, child: Box<dyn LayoutElement>) {
+    pub fn push_child(&mut self, mut child: Box<dyn LayoutElement>) {
+        child.layout_mut().set_parent_id(Some(self.layout.id()));
         self.children.push(child);
         self.layout.invalidate_measure();
     }
@@ -137,14 +138,14 @@ impl LayoutElement for WrapPanel {
         &mut self.layout
     }
 
-    fn measure_override(&mut self, available: Size) -> Size {
+    fn measure_override(&mut self, ctx: &mut LayoutContext, available: Size) -> Size {
         let child_constraint = Size::new(
             self.item_width.unwrap_or(available.width),
             self.item_height.unwrap_or(available.height),
         );
 
         for child in &mut self.children {
-            measure_element(child.as_mut(), child_constraint);
+            measure_element(child.as_mut(), ctx, child_constraint);
         }
 
         let lines = self.lines(available);
@@ -172,7 +173,7 @@ impl LayoutElement for WrapPanel {
         desired
     }
 
-    fn arrange_override(&mut self, final_size: Size) -> Size {
+    fn arrange_override(&mut self, ctx: &mut LayoutContext, final_size: Size) -> Size {
         let lines = self.lines(final_size);
         let mut cross_offset = 0.0;
 
@@ -203,7 +204,7 @@ impl LayoutElement for WrapPanel {
                         Rect::from_xywh(cross_offset, main_offset, line.cross, child_size.height)
                     }
                 };
-                arrange_element(child.as_mut(), rect);
+                arrange_element(child.as_mut(), ctx, rect);
                 main_offset += match self.orientation {
                     Orientation::Horizontal => child_size.width + self.item_spacing,
                     Orientation::Vertical => child_size.height + self.item_spacing,

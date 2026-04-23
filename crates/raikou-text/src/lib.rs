@@ -14,7 +14,7 @@ pub use cosmic_text::{
     LayoutRunIter, LegacyRenderer, LetterSpacing, LineEnding, LineIter, Metrics, Motion,
     PhysicalGlyph, PlatformFallback, Renderer, Scroll, Selection, ShapeBuffer, ShapeGlyph,
     ShapeLine, ShapeRunCache, ShapeRunKey, ShapeSpan, ShapeWord, Shaping, SubpixelBin, SwashCache,
-    Wrap,
+    SwashContent, SwashImage, Wrap,
 };
 
 #[cfg(test)]

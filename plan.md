@@ -67,6 +67,263 @@ Without hit testing there is no way to map a window coordinate (e.g. a mouse cli
 
 ---
 
+### More information:
+
+The paint layer system is fully implemented in data structures but completely unwired to rendering. Here's exactly what's broken and what must change.
+---
+The Current State (Broken)
+What exists:
+- PaintLayer enum with Content and Overlay(AfterContent)
+- WindowPaintList that splits entries into content: Vec<PaintEntry> and overlay: Vec<PaintEntry>
+- LayoutManager::collect_window_paint_list(&self, root: &dyn LayoutElement) -> WindowPaintList
+- PaintLayer::order_key() so Content (0) < Overlay (1)
+What the example actually does (ignoring all of it):
+fn paint_element(painter, element, parent_offset) {
+    // Hard-coded background drawing
+    if let Some(bg) = background_color(element) {
+        painter.fill_rounded_rect(..., bg);
+    }
+    // Recursive tree walk — paints children immediately after parent
+    element.visit_children(|child| paint_element(painter, child, new_offset));
+}
+This is a single-pass tree-order walk. It has three fatal problems:
+1. Layer order is ignored. An overlay child paints immediately after its parent, interleaved with content. A tooltip inside a button paints before the button's sibling panel.
+2. No consumer of WindowPaintList. The list is built but thrown away. No code path calls collect_window_paint_list.
+3. No element lookup by ID. WindowPaintList stores WidgetIds. There is no fn find_element_by_id(id) -> &dyn LayoutElement anywhere in the codebase.
+---
+What Needs To Change (Deep Dive)
+1. Add Absolute Bounds Storage
+Problem: LayoutElement::layout().bounds() is parent-relative. When you paint from a flat list (WindowPaintList), you lose the tree structure that let you accumulate offsets.
+Current: During arrange, DockPanel positions its header child at (0, 0) and its sidebar at (0, 40). These are local coordinates.
+What you need: Layoutable must store an additional absolute_bounds: Rect field that gets updated during arrange_element().
+pub struct Layoutable {
+    // ... existing fields ...
+    pub(crate) bounds: Rect,        // parent-relative (current)
+    pub(crate) absolute_bounds: Rect, // window-relative (NEW)
+}
+Where to set it: In arrange_element(), after computing bounds:
+let bounds = Rect::new(arranged_rect.origin, arranged_size);
+let absolute_bounds = if let Some(parent) = parent_absolute_bounds {
+    Rect::from_xywh(
+        parent.origin.x + bounds.origin.x,
+        parent.origin.y + bounds.origin.y,
+        bounds.size.width,
+        bounds.size.height,
+    )
+} else {
+    bounds // root is already absolute
+};
+layout.absolute_bounds = absolute_bounds;
+Why this matters: When WindowPaintList says "paint widget ID 42", you need to know its window-coordinate position without walking the tree. Overlays especially need absolute coordinates because they float above the content and should not move when parents scroll.
+---
+2. Add Element Lookup By ID
+Problem: WindowPaintList gives you WidgetIds, not element references.
+Current: There is zero mapping from WidgetId → &dyn LayoutElement.
+What you need: LayoutManager should build and maintain a HashMap<WidgetId, *mut dyn LayoutElement> (or a typed equivalent) during the layout pass.
+Implementation approach:
+pub struct LayoutManager {
+    dirty_measure: BTreeSet<WidgetId>,
+    dirty_arrange: BTreeSet<WidgetId>,
+    last_available: Option<Size>,
+    element_map: HashMap<WidgetId, WeakElementRef>, // NEW
+}
+// During measure/arrange, populate the map
+fn register_element(&mut self, element: &dyn LayoutElement) {
+    self.element_map.insert(element.layout().id(), WeakElementRef::from(element));
+}
+// For painting
+pub fn element_by_id(&self, id: WidgetId) -> Option<&dyn LayoutElement> {
+    self.element_map.get(&id).and_then(|w| w.upgrade())
+}
+Alternative (simpler): Instead of a global map, collect_window_paint_list could return a new type that holds direct references:
+pub struct PaintList<'a> {
+    content: Vec<&'a dyn LayoutElement>,
+    overlay: Vec<&'a dyn LayoutElement>,
+}
+impl LayoutManager {
+    pub fn collect_paint_list<'a>(&self, root: &'a dyn LayoutElement) -> PaintList<'a> {
+        let mut content = Vec::new();
+        let mut overlay = Vec::new();
+        self.walk_and_collect(root, &mut content, &mut overlay);
+        PaintList { content, overlay }
+    }
+}
+This avoids the ID→pointer indirection entirely. The list holds &dyn LayoutElement directly.
+---
+3. Change The Paint Loop From Tree-Walk To Layer-Ordered Passes
+Current (broken single pass):
+fn paint(root, painter) {
+    paint_recursive(painter, root, (0.0, 0.0)); // tree order
+}
+New (correct two-pass):
+fn paint(root: &dyn LayoutElement, painter: &Painter, manager: &LayoutManager) {
+    painter.clear(background_color);
+    
+    // Build the paint list from layout manager
+    let list = manager.collect_paint_list(root);
+    
+    // PASS 1: Content layer — paints all normal widgets in tree order
+    for element in list.content {
+        paint_single_element(painter, element);
+    }
+    
+    // PASS 2: Overlay layer — paints tooltips, modals, drag shadows ON TOP
+    for element in list.overlay {
+        paint_single_element(painter, element);
+    }
+}
+Why two passes: If a Panel contains a Button, and that Button contains a Tooltip marked as PaintLayer::Overlay(AfterContent), the tree walk would paint:
+1. Panel background
+2. Button background
+3. Tooltip ← WRONG — paints before Panel's sibling
+4. Button text
+5. Panel's sibling ← WRONG — should paint before Tooltip
+With layer-ordered passes:
+1. Panel background
+2. Button background
+3. Button text
+4. Panel's sibling
+5. Tooltip ← CORRECT — overlays paint after all content
+---
+4. Add paint() To LayoutElement Trait
+Problem: The example hard-codes if let Some(panel) = element.as_any().downcast_ref::<Panel>() { panel.background() }. This only works for Panel. TextBlock, Button, Image etc. have no paint logic.
+What you need: Add fn paint(&self, painter: &Painter<'_>, absolute_offset: (f32, f32)) to the LayoutElement trait.
+pub trait LayoutElement {
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+    fn layout(&self) -> &Layoutable;
+    fn layout_mut(&mut self) -> &mut Layoutable;
+    fn measure_override(&mut self, available: Size) -> Size;
+    fn arrange_override(&mut self, final_size: Size) -> Size;
+    fn visit_children(&self, visitor: &mut dyn FnMut(&dyn LayoutElement));
+    fn visit_children_mut(&mut self, visitor: &mut dyn FnMut(&mut dyn LayoutElement));
+    fn paint_layer(&self) -> PaintLayer { PaintLayer::Content }
+    
+    // NEW: Each element knows how to draw itself
+    fn paint(&self, painter: &Painter<'_>, offset: (f32, f32)) {
+        // Default: no-op. Panels override to draw background.
+        // TextBlock overrides to draw text.
+        // Image overrides to draw image.
+    }
+}
+Panel implementation:
+impl LayoutElement for Panel {
+    // ... existing methods ...
+    
+    fn paint(&self, painter: &Painter<'_>, offset: (f32, f32)) {
+        let bounds = self.layout().absolute_bounds;
+        if let Some(bg) = self.background {
+            let rect = Rect::from_xywh(
+                bounds.origin.x + offset.0,
+                bounds.origin.y + offset.1,
+                bounds.size.width,
+                bounds.size.height,
+            );
+            painter.fill_rounded_rect(RoundedRect::from_rect_xy(rect, 6.0), bg);
+        }
+    }
+}
+---
+5. Overlay Elements Paint In Absolute Coordinates
+Problem: If a scrolled ScrollContentPresenter contains a Button with a Tooltip overlay, the tooltip should not move when the content scrolls.
+Current: The paint loop accumulates parent_offset + child_offset. An overlay inside a scrolled panel gets the scroll offset applied.
+What you need: For overlay elements, use absolute_bounds directly — do NOT add additional parent offset.
+fn paint_single_element(painter: &Painter<'_>, element: &dyn LayoutElement) {
+    let layer = element.paint_layer();
+    let bounds = element.layout().absolute_bounds;
+    
+    match layer {
+        PaintLayer::Content => {
+            // Content paints at absolute_bounds (already includes parent offsets)
+            element.paint(painter, (0.0, 0.0));
+        }
+        PaintLayer::Overlay(_) => {
+            // Overlays paint at absolute_bounds, ignoring any ongoing transform stack
+            // If using Skia save/restore, overlays should NOT inherit parent transforms
+            painter.with_save(|p| {
+                // Reset any parent transforms — overlays are in window space
+                // (Implementation depends on whether you use Skia's matrix stack)
+                element.paint(p, (0.0, 0.0));
+            });
+        }
+    }
+}
+---
+6. Connect It To The Window Runtime
+Problem: The example's RuntimeLifecycle::on_event hand-rolls everything. A real framework needs the runtime to own the paint loop.
+What you need: The window runtime (or a PaintEngine type) should:
+1. Own the LayoutManager
+2. On RedrawRequested, call layout_manager.update(&mut root, window_size)
+3. Then call paint(&root, frame.painter(), &layout_manager)
+Current example architecture:
+impl RuntimeLifecycle for App {
+    fn on_event(&mut self, runtime: &mut WindowRuntime, event: &RuntimeEvent) {
+        match event {
+            RuntimeEvent::RedrawRequested(_) => {
+                self.layout(); // calls measure_element + arrange_element directly
+                // ... hand-rolled paint ...
+            }
+        }
+    }
+}
+New architecture:
+struct App {
+    renderer: Option<SkiaRenderer>,
+    layout_manager: LayoutManager, // NEW
+    root: Box<dyn Widget>,         // assumes widget bridge done
+}
+impl RuntimeLifecycle for App {
+    fn on_event(&mut self, runtime: &mut WindowRuntime, event: &RuntimeEvent) {
+        match event {
+            RuntimeEvent::RedrawRequested(_) => {
+                // LayoutManager handles both layout AND paint list collection
+                let size = self.window_size;
+                self.layout_manager.update(&mut *self.root, size);
+                
+                if let Some(mut renderer) = self.renderer.take() {
+                    let mut frame = renderer.begin_frame().unwrap();
+                    
+                    // PaintEngine consumes WindowPaintList from LayoutManager
+                    paint_from_manager(
+                        &*self.root,
+                        frame.painter(),
+                        &self.layout_manager,
+                    );
+                    
+                    frame.present().unwrap();
+                    self.renderer = Some(renderer);
+                }
+                runtime.request_redraw();
+            }
+        }
+    }
+}
+---
+Summary Of Changes
+File	Change
+raikou-core/src/layoutable.rs (or wherever Layoutable is)	Add absolute_bounds: Rect field
+raikou-layout/src/layoutable.rs	Update arrange_element to compute and store absolute_bounds
+raikou-layout/src/layoutable.rs	Add fn paint(&self, painter, offset) to LayoutElement trait with default no-op
+raikou-layout/src/panels/panel.rs	Implement paint() to draw background using absolute_bounds
+raikou-layout/src/layout_manager.rs	Change collect_window_paint_list to return a list holding &dyn LayoutElement references instead of IDs, OR add element lookup map
+raikou-layout/src/layout_manager.rs	Ensure update() and update_targeted() populate absolute_bounds during arrange
+examples/layout_demo.rs (or runtime)	Replace recursive tree-walk paint with two-pass layer-ordered paint using LayoutManager::collect_window_paint_list
+---
+The Test You Need
+Build this exact tree:
+Root (DockPanel)
+├── Header (Panel, Content layer, dock=Top, 40px)
+├── Sidebar (Panel, Content layer, dock=Left, 150px)
+└── Content (Panel, Content layer, fill)
+    └── Button (Panel, Content layer)
+        ├── Background (Panel, Content layer)
+        └── Tooltip (Panel, Overlay layer) ← THIS IS THE KEY
+Paint it with the old tree-walk method: the tooltip paints immediately after the button background, before the sidebar finishes.
+Paint it with the new layer-ordered method: all content (header, sidebar, content, button) paints first. The tooltip paints last, visually floating above everything.
+Snapshot both. The old method shows the tooltip clipped or overlapped by the sidebar. The new method shows the tooltip on top of everything.
+
+---
+
 ## 4. Parent Invalidation Bubbling
 
 **Why it's needed:**  

@@ -4,7 +4,7 @@ use std::ops::Range;
 use raikou_core::{Rect, Size};
 
 use crate::alignment::Orientation;
-use crate::layoutable::{LayoutElement, Layoutable, arrange_element, measure_element};
+use crate::layoutable::{LayoutContext, LayoutElement, Layoutable, arrange_element, measure_element};
 
 pub trait VirtualizationHost {
     fn realized_range(&self) -> Range<usize>;
@@ -33,7 +33,8 @@ impl ItemsHost {
         }
     }
 
-    pub fn push_child(&mut self, child: Box<dyn LayoutElement>) {
+    pub fn push_child(&mut self, mut child: Box<dyn LayoutElement>) {
+        child.layout_mut().set_parent_id(Some(self.layout.id()));
         self.children.push(child);
         self.recalculate_realized_range();
         self.layout.invalidate_measure();
@@ -122,12 +123,12 @@ impl LayoutElement for ItemsHost {
         &mut self.layout
     }
 
-    fn measure_override(&mut self, available: Size) -> Size {
+    fn measure_override(&mut self, ctx: &mut LayoutContext, available: Size) -> Size {
         // Only measure realized children
         let mut desired = Size::ZERO;
         for index in self.realized_range.clone() {
             if let Some(child) = self.children.get_mut(index) {
-                let child_size = measure_element(child.as_mut(), available);
+                let child_size = measure_element(child.as_mut(), ctx, available);
                 desired.width = desired.width.max(child_size.width);
                 desired.height = desired.height.max(child_size.height);
             }
@@ -150,7 +151,7 @@ impl LayoutElement for ItemsHost {
         desired
     }
 
-    fn arrange_override(&mut self, final_size: Size) -> Size {
+    fn arrange_override(&mut self, ctx: &mut LayoutContext, final_size: Size) -> Size {
         let item_size = self.estimate_item_size();
         let total_logical_size = item_size * self.children.len() as f32;
 
@@ -163,7 +164,7 @@ impl LayoutElement for ItemsHost {
         // Arrange unrealized children with zero rect so they don't paint
         for (index, child) in self.children.iter_mut().enumerate() {
             if !self.realized_range.contains(&index) {
-                arrange_element(child.as_mut(), Rect::from_xywh(0.0, 0.0, 0.0, 0.0));
+                arrange_element(child.as_mut(), ctx, Rect::from_xywh(0.0, 0.0, 0.0, 0.0));
             }
         }
 
@@ -185,7 +186,7 @@ impl LayoutElement for ItemsHost {
                         final_size.height,
                     ),
                 };
-                arrange_element(child.as_mut(), rect);
+                arrange_element(child.as_mut(), ctx, rect);
             }
         }
 

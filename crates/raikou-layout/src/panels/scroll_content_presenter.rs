@@ -2,7 +2,7 @@ use std::any::Any;
 
 use raikou_core::{Rect, Size};
 
-use crate::layoutable::{LayoutElement, Layoutable, arrange_element, measure_element};
+use crate::layoutable::{LayoutContext, LayoutElement, Layoutable, arrange_element, measure_element};
 
 pub struct ScrollContentPresenter {
     layout: Layoutable,
@@ -25,7 +25,8 @@ impl ScrollContentPresenter {
         }
     }
 
-    pub fn set_child(&mut self, child: Box<dyn LayoutElement>) {
+    pub fn set_child(&mut self, mut child: Box<dyn LayoutElement>) {
+        child.layout_mut().set_parent_id(Some(self.layout.id()));
         self.child = Some(child);
         self.layout.invalidate_measure();
     }
@@ -74,10 +75,9 @@ impl LayoutElement for ScrollContentPresenter {
         &mut self.layout
     }
 
-    fn measure_override(&mut self, available: Size) -> Size {
+    fn measure_override(&mut self, ctx: &mut LayoutContext, available: Size) -> Size {
         if let Some(child) = &mut self.child {
-            self.extent = measure_element(child.as_mut(), Size::new(f32::INFINITY, f32::INFINITY));
-            self.viewport = available;
+            self.extent = measure_element(child.as_mut(), ctx, Size::new(f32::INFINITY, f32::INFINITY));
             Size::new(
                 self.extent.width.min(available.width),
                 self.extent.height.min(available.height),
@@ -87,7 +87,7 @@ impl LayoutElement for ScrollContentPresenter {
         }
     }
 
-    fn arrange_override(&mut self, final_size: Size) -> Size {
+    fn arrange_override(&mut self, ctx: &mut LayoutContext, final_size: Size) -> Size {
         self.viewport = final_size;
         if let Some(child) = &mut self.child {
             let extent = child.layout().desired_size();
@@ -101,6 +101,7 @@ impl LayoutElement for ScrollContentPresenter {
 
             arrange_element(
                 child.as_mut(),
+                ctx,
                 Rect::from_xywh(
                     -self.scroll_offset_x,
                     -self.scroll_offset_y,

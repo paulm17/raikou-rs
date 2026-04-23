@@ -5,6 +5,7 @@ members = [
     "crates/raikou-skia",
     "crates/raikou-text",
     "crates/raikou-layout",
+    "crates/raikou-widgets",
 ]
 
 resolver = "2"
@@ -31,6 +32,7 @@ raikou-window = { path = "crates/raikou-window" }
 raikou-skia = { path = "crates/raikou-skia" }
 raikou-text = { path = "crates/raikou-text" }
 raikou-layout = { path = "crates/raikou-layout" }
+raikou-widgets = { path = "crates/raikou-widgets" }
 
 [package]
 name = "raikou-rs"

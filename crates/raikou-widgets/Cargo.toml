@@ -1,5 +1,5 @@
 [package]
-name = "raikou-layout"
+name = "raikou-widgets"
 version.workspace = true
 edition.workspace = true
 
@@ -8,9 +8,10 @@ path = "src/lib.rs"
 
 [dependencies]
 raikou-core.workspace = true
+raikou-layout.workspace = true
 raikou-text.workspace = true
-tracing.workspace = true
+raikou-window.workspace = true
+raikou-skia.workspace = true
 
 [dev-dependencies]
-raikou-skia.workspace = true
 skia-safe.workspace = true
