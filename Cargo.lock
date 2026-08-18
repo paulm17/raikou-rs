@@ -3630,9 +3630,6 @@ dependencies = [
 [[package]]
 name = "raikou-core"
 version = "0.1.0"
-dependencies = [
- "fyrox",
-]
 
 [[package]]
 name = "raikou-playground"
@@ -3645,8 +3642,8 @@ dependencies = [
 name = "raikou-style"
 version = "0.1.0"
 dependencies = [
- "fyrox",
  "raikou-core",
+ "smol_str",
 ]
 
 [[package]]

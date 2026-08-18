@@ -18,6 +18,7 @@ rust-version = "1.94"
 
 [workspace.dependencies]
 fyrox = { git = "https://github.com/FyroxEngine/Fyrox", rev = "d30f42867f526a07608a56975e1c128872b17d33" }
+smol_str = "0.2.2"
 raikou = { path = "crates/raikou", version = "0.1.0" }
 raikou-core = { path = "crates/raikou-core", version = "0.1.0" }
 raikou-style = { path = "crates/raikou-style", version = "0.1.0" }

@@ -16,8 +16,8 @@ Layered crates, each with a single ownership concern:
 | Crate | Path | Owns |
 |-------|------|------|
 | `raikou` | `crates/raikou` | Facade: re-exports the layers; consumers use `raikou::prelude::*` |
-| `raikou-core` | `crates/raikou-core` | Sizing primitives (`Length`, `ControlSize`) |
-| `raikou-style` | `crates/raikou-style` | Theme tokens + style resolution (`Theme`, `ButtonStyle`, `ButtonVariant`) |
+| `raikou-core` | `crates/raikou-core` | Backend-agnostic geometry/paint types (`Color`, `Thickness`, `Rect`) + sizing (`Length`, `ControlSize`, `Padding`, `Margin`, `Radius`) |
+| `raikou-style` | `crates/raikou-style` | Token scales + recipe/variant/state style resolution (`Theme`, `ButtonStyle`, `ButtonVariant`) |
 | `raikou-widgets` | `crates/raikou-widgets` | Component builders + dispatch seam (`Button`, `BuildCx`, `Component`, `ComponentRegistry`) |
 | `raikou-playground` | `crates/raikou-playground` | Interactive playground (scaffold) |
 | `raikou-app` | `app` | The fyrox tool-loop demo app (no raikou dependency) |
@@ -25,6 +25,13 @@ Layered crates, each with a single ownership concern:
 
 The dispatch seam lives in `raikou-widgets`, so adding a component only touches
 `raikou-widgets` plus a new `ComponentKind` variant.
+
+`raikou-core` and `raikou-style` are backend-agnostic: they own their own
+f32-based paint/layout types and the full recipe/state theme system (token
+scales, variants, pseudoclasses). `raikou-widgets` converts core types to fyrox
+at the widget boundary. `Style::merge` uses higher-priority-wins precedence
+(lower `StylePrecedence` number overrides), so variant/state styles layer over
+a component's base recipe.
 
 ## fyrox as a git dependency
 

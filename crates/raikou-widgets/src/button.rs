@@ -5,7 +5,7 @@
 
 use std::rc::Rc;
 
-use fyrox::core::color::Color;
+use fyrox::core::color::Color as FyroxColor;
 use fyrox::core::pool::Handle;
 use fyrox::gui::border::BorderBuilder;
 use fyrox::gui::brush::Brush;
@@ -13,9 +13,9 @@ use fyrox::gui::button::{ButtonBuilder, ButtonMessage};
 use fyrox::gui::decorator::DecoratorBuilder;
 use fyrox::gui::message::UiMessage;
 use fyrox::gui::widget::{WidgetBuilder, WidgetMessage};
-use fyrox::gui::{UiNode, UserInterface, Thickness};
+use fyrox::gui::{UiNode, UserInterface, Thickness as FyroxThickness};
 
-use raikou_core::{ControlSize, Length};
+use raikou_core::{Color, ControlSize, Length, Thickness};
 use raikou_style::ButtonVariant;
 
 use crate::build_cx::BuildCx;
@@ -23,6 +23,24 @@ use crate::component::{ClickEvent, Component, ComponentKind};
 
 type ClickCallback = dyn Fn(&mut UserInterface, &ClickEvent);
 type SimpleCallback = dyn Fn(&mut UserInterface);
+
+fn to_fyrox_color(color: Color) -> FyroxColor {
+    FyroxColor::from_rgba(
+        (color.red * 255.0).round() as u8,
+        (color.green * 255.0).round() as u8,
+        (color.blue * 255.0).round() as u8,
+        (color.alpha * 255.0).round() as u8,
+    )
+}
+
+fn to_fyrox_thickness(thickness: Thickness) -> FyroxThickness {
+    FyroxThickness {
+        left: thickness.left,
+        top: thickness.top,
+        right: thickness.right,
+        bottom: thickness.bottom,
+    }
+}
 
 /// Event handlers of a Button component, kept in the [`crate::ComponentRegistry`].
 #[derive(Clone)]
@@ -102,7 +120,7 @@ impl Button {
             width: Length::Auto,
             height: Length::Shrink,
             padding: ControlSize::Medium.padding(),
-            margin: Thickness::zero(),
+            margin: Thickness::ZERO,
             corner_radius: 4.0,
             is_default: false,
             is_cancel: false,
@@ -211,24 +229,30 @@ impl Button {
                 BorderBuilder::new(WidgetBuilder::new())
                     .with_pad_by_corner_radius(false)
                     .with_corner_radius(style.corner_radius.into())
-                    .with_stroke_thickness(style.border_thickness.into()),
+                    .with_stroke_thickness(to_fyrox_thickness(style.border_thickness).into()),
             )
-            .with_normal_brush(Brush::Solid(style.background).into())
-            .with_hover_brush(Brush::Solid(style.hover).into())
-            .with_pressed_brush(Brush::Solid(style.pressed).into())
+            .with_normal_brush(Brush::Solid(to_fyrox_color(style.background)).into())
+            .with_hover_brush(Brush::Solid(to_fyrox_color(style.hover)).into())
+            .with_pressed_brush(Brush::Solid(to_fyrox_color(style.pressed)).into())
             .build(&mut ctx)
             .to_base()
         };
 
         let mut widget_builder = WidgetBuilder::new()
             .with_name("raikou_button")
-            .with_margin(self.margin)
-            .with_background(Brush::Solid(Color::TRANSPARENT).into());
+            .with_margin(to_fyrox_thickness(self.margin))
+            .with_background(Brush::Solid(to_fyrox_color(Color::TRANSPARENT)).into());
         if let Some(width) = self.width.resolve() {
             widget_builder = widget_builder.with_width(width);
         }
         if let Some(height) = self.height.resolve() {
             widget_builder = widget_builder.with_height(height);
+        }
+        if self.padding != Thickness::ZERO {
+            widget_builder = widget_builder.with_min_size(fyrox::core::algebra::Vector2::new(
+                self.padding.left + self.padding.right,
+                self.padding.top + self.padding.bottom,
+            ));
         }
 
         let handle = {

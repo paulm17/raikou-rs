@@ -5,5 +5,5 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-fyrox.workspace = true
 raikou-core.workspace = true
+smol_str.workspace = true

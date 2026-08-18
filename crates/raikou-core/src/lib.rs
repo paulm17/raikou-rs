@@ -1,8 +1,10 @@
-//! raikou-core — shared primitives for all raikou components.
+//! raikou-core — backend-agnostic shared primitives for all raikou components.
 //!
-//! Sizing and layout concepts that carry no widget or theme logic: the
-//! [`Length`] size unit and the [`ControlSize`] size ladder.
+//! Geometry, paint and layout concepts that carry no widget or theme logic:
+//! colors, sizes, rects, spacing and the control size ladder.
 
-pub mod length;
+pub mod geometry;
+pub mod layout;
 
-pub use length::{ControlSize, Length};
+pub use geometry::{Color, CornerRadii, CornerRadius, Point, Rect, RoundedRect, Size, Thickness};
+pub use layout::{ControlSize, Length, Margin, Padding, Radius};
