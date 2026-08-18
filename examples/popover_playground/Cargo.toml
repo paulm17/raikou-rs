@@ -1,0 +1,16 @@
+[package]
+name = "popover_playground"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[[bin]]
+name = "popover_playground"
+path = "src/main.rs"
+
+[dependencies]
+fyrox.workspace = true
+raikou.workspace = true
+raikou-demo.workspace = true
+raikou-playground.workspace = true
