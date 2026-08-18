@@ -1,0 +1,10 @@
+[package]
+name = "raikou"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+raikou-core.workspace = true
+raikou-style.workspace = true
+raikou-widgets.workspace = true

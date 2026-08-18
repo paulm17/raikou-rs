@@ -1,0 +1,9 @@
+[package]
+name = "raikou-style"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+fyrox.workspace = true
+raikou-core.workspace = true

@@ -1,0 +1,13 @@
+[package]
+name = "button_demo"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "button_demo"
+path = "src/main.rs"
+
+[dependencies]
+fyrox.workspace = true
+raikou.workspace = true
