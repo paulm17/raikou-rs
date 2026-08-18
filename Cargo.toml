@@ -7,7 +7,19 @@ members = [
     "crates/raikou-style",
     "crates/raikou-widgets",
     "crates/raikou-playground",
+    "crates/raikou-demo",
     "examples/button_demo",
+    "examples/widgets_demo",
+    "examples/forms_demo",
+    "examples/containers_demo",
+    "examples/menu_demo",
+    "examples/context_menu_demo",
+    "examples/select_demo",
+    "examples/combobox_demo",
+    "examples/tree_demo",
+    "examples/table_demo",
+    "examples/loading_demo",
+    "examples/playground_demo",
 ]
 default-members = ["app"]
 
@@ -19,10 +31,13 @@ rust-version = "1.94"
 [workspace.dependencies]
 fyrox = { git = "https://github.com/FyroxEngine/Fyrox", rev = "d30f42867f526a07608a56975e1c128872b17d33" }
 smol_str = "0.2.2"
+uuid = "1"
 raikou = { path = "crates/raikou", version = "0.1.0" }
 raikou-core = { path = "crates/raikou-core", version = "0.1.0" }
 raikou-style = { path = "crates/raikou-style", version = "0.1.0" }
 raikou-widgets = { path = "crates/raikou-widgets", version = "0.1.0" }
+raikou-demo = { path = "crates/raikou-demo", version = "0.1.0" }
+raikou-playground = { path = "crates/raikou-playground", version = "0.1.0" }
 
 [profile.dev]
 opt-level = 1

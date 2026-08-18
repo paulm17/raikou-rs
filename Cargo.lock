@@ -823,12 +823,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "combobox_demo"
+version = "0.1.0"
+dependencies = [
+ "fyrox",
+ "raikou",
+ "raikou-demo",
+]
+
+[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ca0197aee26d1ae37445ee532fefce43251d24cc7c166799f4d46817f1d3973"
 dependencies = [
  "crossbeam-utils",
+]
+
+[[package]]
+name = "containers_demo"
+version = "0.1.0"
+dependencies = [
+ "fyrox",
+ "raikou",
+ "raikou-demo",
+]
+
+[[package]]
+name = "context_menu_demo"
+version = "0.1.0"
+dependencies = [
+ "fyrox",
+ "raikou",
+ "raikou-demo",
 ]
 
 [[package]]
@@ -1364,6 +1391,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
 dependencies = [
  "percent-encoding",
+]
+
+[[package]]
+name = "forms_demo"
+version = "0.1.0"
+dependencies = [
+ "fyrox",
+ "raikou",
+ "raikou-demo",
 ]
 
 [[package]]
@@ -2586,6 +2622,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11d3d7f243d5c5a8b9bb5d6dd2b1602c0cb0b9db1621bafc7ed66e35ff9fe092"
 
 [[package]]
+name = "loading_demo"
+version = "0.1.0"
+dependencies = [
+ "fyrox",
+ "raikou",
+ "raikou-demo",
+]
+
+[[package]]
 name = "lock_api"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2651,6 +2696,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "488016bfae457b036d996092f6cb448677611ce4449e970ceaf42695203f218a"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "menu_demo"
+version = "0.1.0"
+dependencies = [
+ "fyrox",
+ "raikou",
+ "raikou-demo",
 ]
 
 [[package]]
@@ -3447,6 +3501,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 
 [[package]]
+name = "playground_demo"
+version = "0.1.0"
+dependencies = [
+ "fyrox",
+ "raikou",
+ "raikou-demo",
+ "raikou-playground",
+]
+
+[[package]]
 name = "png"
 version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3632,9 +3696,18 @@ name = "raikou-core"
 version = "0.1.0"
 
 [[package]]
+name = "raikou-demo"
+version = "0.1.0"
+dependencies = [
+ "fyrox",
+ "raikou",
+]
+
+[[package]]
 name = "raikou-playground"
 version = "0.1.0"
 dependencies = [
+ "fyrox",
  "raikou",
 ]
 
@@ -3653,6 +3726,7 @@ dependencies = [
  "fyrox",
  "raikou-core",
  "raikou-style",
+ "uuid",
 ]
 
 [[package]]
@@ -4119,6 +4193,15 @@ dependencies = [
  "memmap2",
  "smithay-client-toolkit 0.19.2",
  "tiny-skia",
+]
+
+[[package]]
+name = "select_demo"
+version = "0.1.0"
+dependencies = [
+ "fyrox",
+ "raikou",
+ "raikou-demo",
 ]
 
 [[package]]
@@ -4702,6 +4785,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "table_demo"
+version = "0.1.0"
+dependencies = [
+ "fyrox",
+ "raikou",
+ "raikou-demo",
+]
+
+[[package]]
 name = "tbc"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4977,6 +5069,15 @@ checksum = "1ad61aed86bc3faea4300c7aee358b4c6d0c8d6ccc36524c96e4c92ccf26e77e"
 dependencies = [
  "num-integer",
  "strength_reduce",
+]
+
+[[package]]
+name = "tree_demo"
+version = "0.1.0"
+dependencies = [
+ "fyrox",
+ "raikou",
+ "raikou-demo",
 ]
 
 [[package]]
@@ -5363,6 +5464,15 @@ checksum = "de2aaf408e58689c2096682331b1f42bb2d9f2ed6b11560407d023cd0a6c634e"
 dependencies = [
  "bytemuck",
  "safe_arch 1.2.0",
+]
+
+[[package]]
+name = "widgets_demo"
+version = "0.1.0"
+dependencies = [
+ "fyrox",
+ "raikou",
+ "raikou-demo",
 ]
 
 [[package]]

@@ -1,8 +1,11 @@
 [package]
-name = "raikou-playground"
+name = "raikou-demo"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+
+[lib]
+path = "src/lib.rs"
 
 [dependencies]
 fyrox.workspace = true

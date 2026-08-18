@@ -1,16 +1,19 @@
-//! button_demo — a standalone window exercising the raikou `Button` builder.
+//! raikou-demo — a shared tool-loop bootstrap for the per-component example
+//! binaries.
 //!
-//! Shows one button per variant, the three click modes (release/press/hover),
-//! a loading state, and a button with custom child content — all reporting to
-//! a shared counter label. A trimmed version of the app's tool-loop bootstrap:
-//! fyrox engine with a single `UserInterface` in `RenderMode::OnChanges`, a
-//! `ControlFlow::Wait` loop and a message poll that dispatches into the raikou
-//! registry.
+//! Every `examples/*_demo` shows a single raikou component in a standalone
+//! window. Rather than copy the ~270 lines of fyrox engine/winit bootstrap
+//! into each demo, this crate wraps it once and lets each demo supply only:
+//!
+//! * a `title` / window size, and
+//! * a closure that builds the component tree and returns the root handle.
+//!
+//! The shared loop creates a `Theme` + `ComponentRegistry`, links the built
+//! panel to the UI root, polls the message queue and dispatches into the
+//! registry on every frame (mirroring the app's tool-loop pattern).
 
 #![allow(deprecated)]
 
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::sync::Arc;
 
 use fyrox::asset::{io::FsResourceIo, manager::ResourceManager};
@@ -26,159 +29,51 @@ use fyrox::event::{Event, WindowEvent};
 use fyrox::event_loop::{ControlFlow, EventLoop};
 use fyrox::gui::constructor::new_widget_constructor_container;
 use fyrox::gui::font::BUILT_IN_FONT;
-use fyrox::gui::stack_panel::StackPanelBuilder;
-use fyrox::gui::text::{TextBuilder, TextMessage};
-use fyrox::gui::widget::{WidgetBuilder, WidgetMessage};
-use fyrox::gui::{Orientation, RenderMode, Thickness, UiNode, UserInterface};
+use fyrox::gui::message::UiMessage;
+use fyrox::gui::widget::WidgetMessage;
+use fyrox::gui::{RenderMode, UiNode, UserInterface};
 use fyrox::utils::translate_event;
 use fyrox::window::WindowAttributes;
 use raikou::prelude::*;
-use raikou::{Color, Length};
 
-/// Builds a small demo panel driven entirely through the raikou builder API:
-/// one button per variant, all reporting to a shared counter label.
-fn build_demo_panel(
-    ui: &mut UserInterface,
-    theme: &Theme,
-    registry: &mut ComponentRegistry,
-) -> Handle<UiNode> {
-    let mut cx = BuildCx::new(ui, theme, registry);
-
-    let counter: Handle<UiNode> = TextBuilder::new(
-        WidgetBuilder::new()
-            .with_name("raikou_counter")
-            .with_margin(Thickness::uniform(4.0)),
-    )
-    .with_text("raikou clicks: 0")
-    .build(&mut cx.ui().build_ctx())
-    .transmute();
-
-    let count = Rc::new(RefCell::new(0u32));
-
-    let mut buttons: Vec<Handle<UiNode>> = Vec::new();
-    for variant in [
-        ButtonVariant::Filled,
-        ButtonVariant::Outline,
-        ButtonVariant::Ghost,
-        ButtonVariant::Subtle,
-        ButtonVariant::Link,
-    ] {
-        let count = Rc::clone(&count);
-        let button = Button::new()
-            .text(variant_label(variant))
-            .variant(variant)
-            .size(ControlSize::Medium)
-            .on_click(move |ui, _event| {
-                *count.borrow_mut() += 1;
-                let total = *count.borrow();
-                ui.send(
-                    counter,
-                    TextMessage::Text(format!("raikou clicks: {total}")),
-                );
-            })
-            .build(&mut cx);
-        buttons.push(button.into());
-    }
-
-    let row: Handle<UiNode> = StackPanelBuilder::new(
-        WidgetBuilder::new()
-            .with_margin(Thickness::uniform(4.0))
-            .with_children(buttons),
-    )
-    .with_orientation(Orientation::Horizontal)
-    .build(&mut cx.ui().build_ctx())
-    .transmute();
-
-    // Click modes: Release (default), Press and Hover.
-    let mut click_buttons: Vec<Handle<UiNode>> = Vec::new();
-    for (label, mode) in [
-        ("Release", ClickMode::Release),
-        ("Press", ClickMode::Press),
-        ("Hover", ClickMode::Hover),
-    ] {
-        let count = Rc::clone(&count);
-        let button = Button::new()
-            .text(label)
-            .variant(ButtonVariant::Subtle)
-            .click_mode(mode)
-            .on_click(move |ui, _event| {
-                *count.borrow_mut() += 1;
-                let total = *count.borrow();
-                ui.send(
-                    counter,
-                    TextMessage::Text(format!("raikou clicks: {total}")),
-                );
-            })
-            .build(&mut cx);
-        click_buttons.push(button.into());
-    }
-
-    let click_row: Handle<UiNode> = StackPanelBuilder::new(
-        WidgetBuilder::new()
-            .with_margin(Thickness::uniform(4.0))
-            .with_children(click_buttons),
-    )
-    .with_orientation(Orientation::Horizontal)
-    .build(&mut cx.ui().build_ctx())
-    .transmute();
-
-    // Loading and custom-content states.
-    let loading_button = Button::new()
-        .text("Save")
-        .is_loading(true)
-        .build(&mut cx);
-    let loading_button_handle: Handle<UiNode> = loading_button.into();
-
-    let content_box = BoxWidget::new()
-        .width(Length::Fixed(14.0))
-        .height(Length::Fixed(14.0))
-        .color(Color::new(0.13, 0.39, 0.94, 1.0))
-        .corner_radius(3.0)
-        .build(&mut cx);
-    let content_box_handle: Handle<UiNode> = content_box.into();
-    let content_button = Button::new()
-        .variant(ButtonVariant::Outline)
-        .content(content_box_handle)
-        .build(&mut cx);
-    let content_button_handle: Handle<UiNode> = content_button.into();
-
-    let state_row: Handle<UiNode> = StackPanelBuilder::new(
-        WidgetBuilder::new()
-            .with_margin(Thickness::uniform(4.0))
-            .with_children(vec![loading_button_handle, content_button_handle]),
-    )
-    .with_orientation(Orientation::Horizontal)
-    .build(&mut cx.ui().build_ctx())
-    .transmute();
-
-    StackPanelBuilder::new(
-        WidgetBuilder::new()
-            .with_name("raikou_panel")
-            .with_margin(Thickness::uniform(8.0))
-            .with_child(counter)
-            .with_child(row)
-            .with_child(click_row)
-            .with_child(state_row),
-    )
-    .build(&mut cx.ui().build_ctx())
-    .transmute()
+/// Configuration for a demo window.
+pub struct Options {
+    /// Window title.
+    pub title: String,
+    /// Initial window width.
+    pub width: u32,
+    /// Initial window height.
+    pub height: u32,
 }
 
-fn variant_label(variant: ButtonVariant) -> &'static str {
-    match variant {
-        ButtonVariant::Filled => "Filled",
-        ButtonVariant::Outline => "Outline",
-        ButtonVariant::Ghost => "Ghost",
-        ButtonVariant::Subtle => "Subtle",
-        ButtonVariant::Link => "Link",
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            title: "raikou demo".to_string(),
+            width: 900,
+            height: 600,
+        }
     }
 }
 
-fn main() {
+/// Builds the component tree for a demo. Receives the live `UserInterface`,
+/// the resolved `Theme`, and the `ComponentRegistry` (already wired to
+/// dispatch on every polled message).
+pub type PanelBuilder<'a> = dyn FnOnce(
+        &mut UserInterface,
+        &Theme,
+        &mut ComponentRegistry,
+    ) -> Handle<UiNode>
+    + 'a;
+
+/// Runs a demo window: boots the fyrox engine with a single `UserInterface`,
+/// builds the panel via `build`, and drives the tool loop until the window
+/// closes.
+pub fn run(options: Options, build: Box<PanelBuilder>) {
     let mut window_attributes = WindowAttributes::default();
-    window_attributes.inner_size = Some(PhysicalSize::new(900, 600).into());
+    window_attributes.inner_size = Some(PhysicalSize::new(options.width, options.height).into());
     window_attributes.resizable = true;
-    window_attributes.title = "raikou — button demo".to_string();
+    window_attributes.title = options.title.clone();
 
     let serialization_context = Arc::new(SerializationContext::new());
     let task_pool = Arc::new(TaskPool::new());
@@ -210,7 +105,7 @@ fn main() {
 
     let mut registry = ComponentRegistry::default();
     let theme = Theme::light();
-    let panel = build_demo_panel(engine.user_interfaces.first_mut(), &theme, &mut registry);
+    let panel = build(engine.user_interfaces.first_mut(), &theme, &mut registry);
     {
         let ui = engine.user_interfaces.first_mut();
         let root = ui.root();
@@ -254,15 +149,16 @@ fn main() {
                         loop {
                             let poll_result = ui.poll_message_queue();
                             if let Some(message) = poll_result.message {
-                                registry.dispatch(ui, &message);
+                                dispatch_message(ui, &mut registry, &message);
                             } else {
                                 break;
                             }
                         }
                     }
-                    // engine.update drives UserInterface::update -> update_layout, which
-                    // measures/arranges every node and processes pending messages. Without
-                    // it the UI has no geometry and renders as a blank screen.
+                    // engine.update drives UserInterface::update -> update_layout,
+                    // which measures/arranges every node and processes pending
+                    // messages. Without it the UI has no geometry and renders as a
+                    // blank screen.
                     engine.update(
                         time_step,
                         ApplicationLoopController::ActiveEventLoop(active_event_loop),
@@ -313,9 +209,6 @@ fn main() {
                             ui.need_render = true;
                         }
                         WindowEvent::RedrawRequested => {
-                            // Under RenderMode::OnChanges the UI is only actually drawn
-                            // when `need_render` is set; rendering otherwise would wipe
-                            // the visible UI with the clear color.
                             let ui = engine.user_interfaces.first();
                             if ui.need_render {
                                 engine.render().unwrap();
@@ -334,4 +227,11 @@ fn main() {
             }
         })
         .unwrap();
+}
+
+/// Default dispatcher: routes each polled message into the raikou registry so
+/// component handlers fire. Demos that need extra message handling wrap this
+/// with their own logic before calling it.
+pub fn dispatch_message(ui: &mut UserInterface, registry: &mut ComponentRegistry, message: &UiMessage) {
+    registry.dispatch(ui, message);
 }
