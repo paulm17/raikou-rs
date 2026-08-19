@@ -2313,6 +2313,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "image_playground"
+version = "0.1.0"
+dependencies = [
+ "fyrox",
+ "raikou",
+ "raikou-demo",
+]
+
+[[package]]
 name = "imageproc"
 version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

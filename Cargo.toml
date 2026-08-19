@@ -40,6 +40,7 @@ members = [
     "examples/checkbox_playground",
     "examples/select_playground",
     "examples/accordion_playground",
+    "examples/image_playground",
 ]
 default-members = ["app"]
 

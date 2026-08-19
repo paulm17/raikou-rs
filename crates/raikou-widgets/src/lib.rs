@@ -15,6 +15,7 @@ pub mod component;
 pub mod context_menu;
 pub mod convert;
 pub mod group;
+pub mod image;
 pub mod label_widget;
 pub mod loading_indicator;
 pub mod menu;
@@ -45,8 +46,9 @@ pub use component::{ClickEvent, Component, ComponentKind};
 pub use context_menu::{
     hide_context_menu, show_context_menu, ContextMenu, ContextMenuHandle,
 };
-pub use convert::{to_fyrox_color, to_fyrox_thickness};
+pub use convert::{to_fyrox_color, to_fyrox_gradient, to_fyrox_thickness};
 pub use group::{Group, GroupHandle};
+pub use image::{set_image_fit, set_image_texture, Image, ImageHandle};
 pub use label_widget::{set_label_text, Label, LabelHandle};
 pub use loading_indicator::{LoadingIndicator, LoadingIndicatorHandle, LoadingIndicatorMode};
 pub use menu::{MenuBar, MenuBarHandle, MenuItem};

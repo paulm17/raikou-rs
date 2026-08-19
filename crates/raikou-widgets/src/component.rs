@@ -12,6 +12,7 @@ use crate::button::ButtonHandlers;
 use crate::checkbox::CheckboxHandlers;
 use crate::combobox::ComboboxHandlers;
 use crate::context_menu::ContextMenuHandlers;
+use crate::image::ImageHandlers;
 use crate::menu::MenuBarHandlers;
 use crate::radio::{RadioGroupHandlers, RadioGroupItemHandlers, RadioHandlers};
 use crate::scroll_area::ScrollAreaHandlers;
@@ -75,6 +76,8 @@ pub enum ComponentKind {
     Combobox(ComboboxHandlers),
     /// Handlers for a [`crate::Tree`] component.
     Tree(TreeHandlers),
+    /// Handlers for an [`crate::Image`] component.
+    Image(ImageHandlers),
     /// A component with no dispatchable handlers (e.g. a static label or box).
     Static,
 }
@@ -101,6 +104,7 @@ impl ComponentKind {
             ComponentKind::Select(handlers) => handlers.dispatch(ui, message),
             ComponentKind::Combobox(handlers) => handlers.dispatch(ui, message),
             ComponentKind::Tree(handlers) => handlers.dispatch(ui, message),
+            ComponentKind::Image(_) => {}
             ComponentKind::Static => {}
         }
     }

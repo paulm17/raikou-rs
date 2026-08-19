@@ -5,6 +5,10 @@
 
 pub mod geometry;
 pub mod layout;
+pub mod paint;
+pub mod text;
 
 pub use geometry::{Color, CornerRadii, CornerRadius, Point, Rect, RoundedRect, Size, Thickness};
 pub use layout::{ControlSize, Length, Margin, Padding, Radius};
+pub use paint::{GradientStop, ImageFit, LinearGradient};
+pub use text::{CaretAffinity, TextRange};
