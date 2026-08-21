@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use fyrox::core::pool::Handle;
 use fyrox::gui::check_box::{CheckBoxBuilder, CheckBoxMessage};
-use fyrox::gui::message::UiMessage;
+use fyrox::gui::message::{MessageDirection, UiMessage};
 use fyrox::gui::stack_panel::StackPanelBuilder;
 use fyrox::gui::widget::WidgetBuilder;
 use fyrox::gui::{UiNode, UserInterface};
@@ -31,6 +31,9 @@ pub struct RadioHandlers {
 impl RadioHandlers {
     /// Routes a UI message to the matching handler.
     pub fn dispatch(&self, ui: &mut UserInterface, message: &UiMessage) {
+        if message.direction() != MessageDirection::FromWidget {
+            return;
+        }
         if let Some(CheckBoxMessage::Check(state)) = message.data::<CheckBoxMessage>() {
             if let Some(callback) = &self.on_change {
                 callback(ui, state.unwrap_or(false));

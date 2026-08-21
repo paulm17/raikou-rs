@@ -3,7 +3,7 @@
 use std::rc::Rc;
 
 use fyrox::core::pool::Handle;
-use fyrox::gui::message::UiMessage;
+use fyrox::gui::message::{MessageDirection, UiMessage};
 use fyrox::gui::tree::{TreeBuilder, TreeRootBuilder, TreeRootMessage};
 use fyrox::gui::widget::WidgetBuilder;
 use fyrox::gui::{UiNode, UserInterface};
@@ -61,6 +61,9 @@ pub struct TreeHandlers {
 
 impl TreeHandlers {
     pub fn dispatch(&self, ui: &mut UserInterface, message: &UiMessage) {
+        if message.direction() != MessageDirection::FromWidget {
+            return;
+        }
         if let Some(on_select) = &self.on_select {
             if let Some(TreeRootMessage::Select(selected)) = message.data::<TreeRootMessage>() {
                 on_select(ui, selected.len());

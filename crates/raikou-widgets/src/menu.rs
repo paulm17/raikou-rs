@@ -4,8 +4,13 @@
 use std::rc::Rc;
 
 use fyrox::core::pool::Handle;
+use fyrox::gui::border::Border;
+use fyrox::gui::brush::Brush;
+use fyrox::gui::decorator::{Decorator, DecoratorMessage};
+use fyrox::gui::dropdown_menu::DropdownMenu;
 use fyrox::gui::menu::{MenuItemBuilder, MenuItemContent, MenuItemMessage};
 use fyrox::gui::message::UiMessage;
+use fyrox::gui::popup::Popup;
 use fyrox::gui::widget::WidgetBuilder;
 use fyrox::gui::{UiNode, UserInterface};
 
@@ -13,9 +18,98 @@ use raikou_core::Thickness;
 
 use crate::build_cx::BuildCx;
 use crate::component::{Component, ComponentKind};
-use crate::convert::to_fyrox_thickness;
+use crate::convert::{to_fyrox_color, to_fyrox_thickness};
 
 type ItemClickCallback = dyn Fn(&mut UserInterface, usize);
+
+/// Applies Fluent flyout styling to every popup body and menu-item
+/// decorator reachable from `roots` (including nested sub-menu popups,
+/// which live outside the normal widget tree).
+pub(crate) fn style_menu_chrome(
+    ui: &mut UserInterface,
+    theme: &raikou_style::Theme,
+    roots: &[Handle<UiNode>],
+) {
+    use fyrox::graph::SceneGraph;
+
+    let fallback_white = raikou_core::Color::new(1.0, 1.0, 1.0, 1.0);
+    let elevated = Brush::Solid(to_fyrox_color(theme.color("surface.elevated").unwrap_or(fallback_white)));
+    let stroke = Brush::Solid(to_fyrox_color(
+        theme.color("border.subtle").unwrap_or(raikou_core::Color::new(0.0, 0.0, 0.0, 0.14)),
+    ));
+    let hover = Brush::Solid(to_fyrox_color(
+        theme
+            .color("fluent.list.low")
+            .unwrap_or(raikou_core::Color::new(0.0, 0.0, 0.0, 0.05)),
+    ));
+    let pressed = Brush::Solid(to_fyrox_color(
+        theme
+            .color("fluent.list.medium")
+            .unwrap_or(raikou_core::Color::new(0.0, 0.0, 0.0, 0.10)),
+    ));
+
+    let mut stack: Vec<Handle<UiNode>> = roots.to_vec();
+    let mut visited: Vec<Handle<UiNode>> = roots.to_vec();
+    while let Some(h) = stack.pop() {
+        if h.is_none() {
+            continue;
+        }
+
+        // ContextMenu wraps a Popup that is not its own node.
+        if let Ok(cm) = ui.try_get_of_type::<fyrox::gui::menu::ContextMenu>(h) {
+            let popup_node: Handle<UiNode> = cm.popup.widget.handle;
+            if !popup_node.is_none() && !visited.contains(&popup_node) {
+                visited.push(popup_node);
+                stack.push(popup_node);
+            }
+        }
+        // Popup bodies are Borders with a stock dark background.
+        if let Ok(popup) = ui.try_get_of_type::<Popup>(h) {
+            let body: Handle<UiNode> = *popup.body;
+            if !body.is_none() {
+                ui.send(body, fyrox::gui::widget::WidgetMessage::Background(elevated.clone().into()));
+                ui.send(body, fyrox::gui::widget::WidgetMessage::Foreground(stroke.clone().into()));
+                if let Ok(mut border) = ui.try_get_mut_of_type::<Border>(body) {
+                    border.corner_radius.set_value_and_mark_modified(4.0f32.into());
+                }
+            }
+        }
+        // Dropdown menus keep their popup outside the widget tree.
+        if let Ok(dropdown) = ui.try_get_of_type::<DropdownMenu>(h) {
+            let popup: Handle<UiNode> = dropdown.popup.to_base();
+            if !popup.is_none() && !visited.contains(&popup) {
+                visited.push(popup);
+                stack.push(popup);
+            }
+        }
+        // Menu items carry their own sub-menu popups + a Decorator child.
+        if let Ok(item) = ui.try_get_of_type::<fyrox::gui::menu::MenuItem>(h) {
+            let items_panel = item.items_panel.to_base();
+            if !items_panel.is_none() && !visited.contains(&items_panel) {
+                visited.push(items_panel);
+                stack.push(items_panel);
+            }
+            let node = ui.node(h);
+            if node.children.len() == 1 {
+                let decorator = node.children[0];
+                if ui.try_get_of_type::<Decorator>(decorator).is_ok() {
+                    ui.send(decorator, DecoratorMessage::NormalBrush(Brush::Solid(fyrox::core::color::Color::TRANSPARENT).into()));
+                    ui.send(decorator, DecoratorMessage::HoverBrush(hover.clone().into()));
+                    ui.send(decorator, DecoratorMessage::PressedBrush(pressed.clone().into()));
+                    ui.send(decorator, DecoratorMessage::SelectedBrush(hover.clone().into()));
+                }
+            }
+        }
+
+        for child in ui.node(h).children().to_vec() {
+            if child.is_some() && !visited.contains(&child) {
+                visited.push(child);
+                stack.push(child);
+            }
+        }
+    }
+}
+
 
 /// A single menu item. Leaf items fire `on_click` (indexed); items with
 /// `children` render as a sub-menu.
@@ -168,20 +262,36 @@ impl MenuBar {
             let panel = fyrox::gui::stack_panel::StackPanelBuilder::new(
                 WidgetBuilder::new()
                     .with_name("raikou_menu_bar")
-                    .with_children(dropdown_handles),
+                    .with_children(dropdown_handles.clone()),
             )
             .with_orientation(fyrox::gui::Orientation::Horizontal)
             .build(&mut ctx);
             panel.to_base()
         };
 
+        // Fluent styling for the bar's dropdown popups + item decorators.
+        {
+            let mut roots = vec![handle];
+            roots.extend(dropdown_handles.iter().copied());
+            let theme = cx.theme().clone();
+            style_menu_chrome(cx.ui(), &theme, &roots);
+        }
+        let _ = dropdown_handles;
+
         let kind = ComponentKind::MenuBar(MenuBarHandlers {
-            item_handles,
+            item_handles: item_handles.clone(),
             on_item_click: self.on_item_click,
         });
-        let component = Component { handle, kind };
-        cx.register(&component);
-        component
+        // Clicks target individual item handles, so the handlers must be
+        // reachable from every item destination, not just the bar root.
+        cx.register(&Component { handle, kind: kind.clone() });
+        for item in &item_handles {
+            cx.register(&Component {
+                handle: *item,
+                kind: kind.clone(),
+            });
+        }
+        Component { handle, kind }
     }
 }
 

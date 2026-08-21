@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use fyrox::core::pool::Handle;
 use fyrox::gui::dropdown_list::{DropdownListBuilder, DropdownListMessage};
-use fyrox::gui::message::UiMessage;
+use fyrox::gui::message::{MessageDirection, UiMessage};
 use fyrox::gui::widget::WidgetBuilder;
 use fyrox::gui::{UiNode, UserInterface};
 
@@ -12,7 +12,6 @@ use raikou_core::Thickness;
 
 use crate::build_cx::BuildCx;
 use crate::component::{Component, ComponentKind};
-use crate::convert::to_fyrox_thickness;
 
 type ChangeCallback = dyn Fn(&mut UserInterface, usize);
 
@@ -20,15 +19,30 @@ type ChangeCallback = dyn Fn(&mut UserInterface, usize);
 #[derive(Clone)]
 pub struct SelectHandlers {
     on_change: Option<Rc<ChangeCallback>>,
+    /// The inner dropdown list that receives programmatic commands.
+    command_target: Handle<UiNode>,
 }
 
 impl SelectHandlers {
     pub fn dispatch(&self, ui: &mut UserInterface, message: &UiMessage) {
-        if let Some(on_change) = &self.on_change {
-            if let Some(DropdownListMessage::Selection(Some(index))) =
-                message.data::<DropdownListMessage>()
+        if let Some(selection) = message.data::<DropdownListMessage>() {
+            // Forward ToWidget commands aimed at the outer chrome to the
+            // inner dropdown list (skips the forwarded copy itself).
+            if message.direction() == MessageDirection::ToWidget
+                && message.destination() != self.command_target
             {
-                on_change(ui, *index);
+                ui.send(self.command_target, selection.clone());
+                return;
+            }
+            if message.direction() != MessageDirection::FromWidget {
+                return;
+            }
+            if let Some(on_change) = &self.on_change {
+                if let Some(DropdownListMessage::Selection(Some(index))) =
+                    message.data::<DropdownListMessage>()
+                {
+                    on_change(ui, *index);
+                }
             }
         }
     }
@@ -97,25 +111,24 @@ impl Select {
 
     /// Builds the select, adds it to the UI and registers its handlers.
     pub fn build(self, cx: &mut BuildCx) -> Component {
-        let mut ctx = cx.ctx();
+        let theme = cx.theme().clone();
 
-        let mut item_nodes = Vec::new();
-        for item in &self.items {
-            let font = ctx.default_font();
-            let text = fyrox::gui::text::TextBuilder::new(WidgetBuilder::new())
-                .with_text(item)
-                .with_font(font)
-                .build(&mut ctx);
-            item_nodes.push(text.to_base());
-        }
+        let inner = {
+            let mut ctx = cx.ctx();
 
-        let handle = {
-            let mut builder = DropdownListBuilder::new(
-                WidgetBuilder::new()
-                    .with_name("raikou_select")
-                    .with_margin(to_fyrox_thickness(self.margin)),
-            )
-            .with_items(item_nodes);
+            let mut item_nodes = Vec::new();
+            for item in &self.items {
+                let font = ctx.default_font();
+                let text = fyrox::gui::text::TextBuilder::new(WidgetBuilder::new())
+                    .with_text(item)
+                    .with_font(font)
+                    .build(&mut ctx);
+                item_nodes.push(text.to_base());
+            }
+
+            let mut builder =
+                DropdownListBuilder::new(WidgetBuilder::new().with_name("raikou_select_inner"))
+                    .with_items(item_nodes);
 
             if let Some(selected) = self.selected {
                 builder = builder.with_selected(selected);
@@ -124,13 +137,34 @@ impl Select {
             builder.build(&mut ctx).to_base()
         };
 
+        let handle = {
+            let mut ctx = cx.ctx();
+            crate::field::field_chrome(
+                &mut ctx,
+                &theme,
+                inner,
+                crate::field::FIELD_MIN_HEIGHT,
+                self.margin,
+            )
+        };
+
         let component = Component {
             handle,
             kind: ComponentKind::Select(SelectHandlers {
-                on_change: self.on_change,
+                on_change: self.on_change.clone(),
+                command_target: inner,
             }),
         };
         cx.register(&component);
+        // The inner dropdown list emits the FromWidget messages; register it
+        // too so exact-destination dispatch finds the handlers.
+        cx.register(&Component {
+            handle: inner,
+            kind: ComponentKind::Select(SelectHandlers {
+                on_change: self.on_change,
+                command_target: inner,
+            }),
+        });
         component
     }
 }

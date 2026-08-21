@@ -7,3 +7,4 @@ rust-version.workspace = true
 [dependencies]
 fyrox.workspace = true
 raikou.workspace = true
+raikou-style.workspace = true

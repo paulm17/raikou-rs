@@ -9,3 +9,6 @@ fyrox.workspace = true
 raikou-core.workspace = true
 raikou-style.workspace = true
 uuid.workspace = true
+
+[dev-dependencies]
+raikou-playground.workspace = true

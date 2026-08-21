@@ -6,7 +6,7 @@
 use std::rc::Rc;
 
 use fyrox::core::pool::Handle;
-use fyrox::gui::message::UiMessage;
+use fyrox::gui::message::{MessageDirection, UiMessage};
 use fyrox::gui::numeric::{NumericUpDownBuilder, NumericUpDownMessage};
 use fyrox::gui::widget::WidgetBuilder;
 use fyrox::gui::{UiNode, UserInterface};
@@ -15,7 +15,6 @@ use raikou_core::Thickness;
 
 use crate::build_cx::BuildCx;
 use crate::component::{Component, ComponentKind};
-use crate::convert::to_fyrox_thickness;
 
 type ChangeCallback = dyn Fn(&mut UserInterface, f64);
 
@@ -24,15 +23,31 @@ type ChangeCallback = dyn Fn(&mut UserInterface, f64);
 pub struct StepInputHandlers {
     /// Invoked with the new value whenever it changes.
     pub on_change: Option<Rc<ChangeCallback>>,
+    /// The inner numeric widget that receives programmatic commands.
+    pub command_target: Handle<UiNode>,
 }
 
 impl StepInputHandlers {
     /// Routes a UI message to the matching handler.
     pub fn dispatch(&self, ui: &mut UserInterface, message: &UiMessage) {
-        if let Some(NumericUpDownMessage::Value(value)) = message.data::<NumericUpDownMessage<f64>>()
-        {
-            if let Some(callback) = &self.on_change {
-                callback(ui, *value);
+        if let Some(value) = message.data::<NumericUpDownMessage<f64>>() {
+            // Forward ToWidget commands aimed at the outer chrome to the
+            // inner numeric widget (skips the forwarded copy itself).
+            if message.direction() == MessageDirection::ToWidget
+                && message.destination() != self.command_target
+            {
+                ui.send(self.command_target, value.clone());
+                return;
+            }
+            if message.direction() != MessageDirection::FromWidget {
+                return;
+            }
+            if let Some(NumericUpDownMessage::Value(value)) =
+                message.data::<NumericUpDownMessage<f64>>()
+            {
+                if let Some(callback) = &self.on_change {
+                    callback(ui, *value);
+                }
             }
         }
     }
@@ -117,11 +132,11 @@ impl StepInput {
 
     /// Builds the step input, adds it to the UI and registers its handlers.
     pub fn build(self, cx: &mut BuildCx) -> Component {
-        let widget_builder = WidgetBuilder::new()
-            .with_name("raikou_step_input")
-            .with_margin(to_fyrox_thickness(self.margin));
+        let theme = cx.theme().clone();
 
-        let handle = {
+        let inner = {
+            let widget_builder = WidgetBuilder::new().with_name("raikou_step_input_inner");
+
             let mut ctx = cx.ctx();
             NumericUpDownBuilder::<f64>::new(widget_builder)
                 .with_value(self.value)
@@ -133,13 +148,34 @@ impl StepInput {
                 .to_base()
         };
 
+        let handle = {
+            let mut ctx = cx.ctx();
+            crate::field::field_chrome(
+                &mut ctx,
+                &theme,
+                inner,
+                crate::field::FIELD_MIN_HEIGHT,
+                self.margin,
+            )
+        };
+
         let component = Component {
             handle,
             kind: ComponentKind::StepInput(StepInputHandlers {
-                on_change: self.on_change,
+                on_change: self.on_change.clone(),
+                command_target: inner,
             }),
         };
         cx.register(&component);
+        // The inner numeric widget emits the FromWidget messages; register it
+        // too so exact-destination dispatch finds the handlers.
+        cx.register(&Component {
+            handle: inner,
+            kind: ComponentKind::StepInput(StepInputHandlers {
+                on_change: self.on_change,
+                command_target: inner,
+            }),
+        });
         component
     }
 }

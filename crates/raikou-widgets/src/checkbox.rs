@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 use fyrox::core::pool::Handle;
 use fyrox::gui::check_box::{CheckBoxBuilder, CheckBoxMessage};
-use fyrox::gui::message::UiMessage;
+use fyrox::gui::message::{MessageDirection, UiMessage};
 use fyrox::gui::widget::WidgetBuilder;
 use fyrox::gui::{UiNode, UserInterface};
 
@@ -29,6 +29,9 @@ pub struct CheckboxHandlers {
 impl CheckboxHandlers {
     /// Routes a UI message to the matching handler.
     pub fn dispatch(&self, ui: &mut UserInterface, message: &UiMessage) {
+        if message.direction() != MessageDirection::FromWidget {
+            return;
+        }
         if let Some(CheckBoxMessage::Check(state)) = message.data::<CheckBoxMessage>() {
             if let Some(callback) = &self.on_change {
                 callback(ui, state.unwrap_or(false));
@@ -104,7 +107,8 @@ impl Checkbox {
             let font = ctx.default_font();
             fyrox::gui::text::TextBuilder::new(
                 WidgetBuilder::new()
-                    .with_margin(to_fyrox_thickness(Thickness::new(0.0, 0.0, 0.0, 0.0))),
+                    .with_margin(to_fyrox_thickness(Thickness::new(0.0, 0.0, 0.0, 0.0)))
+                    .with_vertical_alignment(fyrox::gui::VerticalAlignment::Center),
             )
             .with_text(&self.label)
             .with_font(font)
@@ -124,6 +128,21 @@ impl Checkbox {
                 .build(&mut ctx)
                 .to_base()
         };
+
+        // The native check box lays itself out on a stretched grid row, which
+        // makes it claim all available height inside constrained containers.
+        // Switch the grid to auto sizing so the widget hugs its content.
+        {
+            use fyrox::graph::SceneGraph;
+            use fyrox::gui::grid::{Column, Grid, Row};
+            let ui = cx.ui();
+            if let Some(grid_handle) = ui.node(handle).children().first().copied() {
+                if let Ok(grid) = ui.try_get_mut_of_type::<Grid>(grid_handle) {
+                    *grid.rows.borrow_mut() = vec![Row::auto()];
+                    *grid.columns.borrow_mut() = vec![Column::auto(), Column::auto()];
+                }
+            }
+        }
 
         let component = Component {
             handle,

@@ -8,7 +8,7 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use fyrox::core::pool::Handle;
-use fyrox::gui::message::UiMessage;
+use fyrox::gui::message::{MessageDirection, UiMessage};
 use fyrox::gui::scroll_viewer::{ScrollViewerBuilder, ScrollViewerMessage};
 use fyrox::gui::widget::WidgetBuilder;
 use fyrox::gui::{UiNode, UserInterface};
@@ -34,6 +34,9 @@ pub struct ScrollAreaHandlers {
 impl ScrollAreaHandlers {
     /// Routes a UI message to the matching handler.
     pub fn dispatch(&self, ui: &mut UserInterface, message: &UiMessage) {
+        if message.direction() != MessageDirection::FromWidget {
+            return;
+        }
         let mut changed = None;
         if let Some(ScrollViewerMessage::VerticalScroll(v)) = message.data::<ScrollViewerMessage>() {
             self.v_offset.set(*v);

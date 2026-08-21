@@ -3819,7 +3819,9 @@ name = "raikou-demo"
 version = "0.1.0"
 dependencies = [
  "fyrox",
+ "image",
  "raikou",
+ "raikou-style",
 ]
 
 [[package]]
@@ -3828,12 +3830,14 @@ version = "0.1.0"
 dependencies = [
  "fyrox",
  "raikou",
+ "raikou-style",
 ]
 
 [[package]]
 name = "raikou-style"
 version = "0.1.0"
 dependencies = [
+ "fyrox",
  "raikou-core",
  "smol_str",
 ]
@@ -3844,6 +3848,7 @@ version = "0.1.0"
 dependencies = [
  "fyrox",
  "raikou-core",
+ "raikou-playground",
  "raikou-style",
  "uuid",
 ]

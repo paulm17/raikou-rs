@@ -6,7 +6,7 @@
 use std::rc::Rc;
 
 use fyrox::core::pool::Handle;
-use fyrox::gui::message::UiMessage;
+use fyrox::gui::message::{MessageDirection, UiMessage};
 use fyrox::gui::text::TextMessage;
 use fyrox::gui::text_box::{TextCommitMode, TextBoxBuilder};
 use fyrox::gui::widget::WidgetBuilder;
@@ -16,7 +16,6 @@ use raikou_core::Thickness;
 
 use crate::build_cx::BuildCx;
 use crate::component::{Component, ComponentKind};
-use crate::convert::to_fyrox_thickness;
 
 type ChangeCallback = dyn Fn(&mut UserInterface, &str);
 
@@ -25,14 +24,29 @@ type ChangeCallback = dyn Fn(&mut UserInterface, &str);
 pub struct TextAreaHandlers {
     /// Invoked with the current text whenever it changes.
     pub on_change: Option<Rc<ChangeCallback>>,
+    /// The inner text box that receives programmatic commands.
+    pub command_target: Handle<UiNode>,
 }
 
 impl TextAreaHandlers {
     /// Routes a UI message to the matching handler.
     pub fn dispatch(&self, ui: &mut UserInterface, message: &UiMessage) {
-        if let Some(TextMessage::Text(text)) = message.data::<TextMessage>() {
-            if let Some(callback) = &self.on_change {
-                callback(ui, text);
+        if let Some(text_msg) = message.data::<TextMessage>() {
+            // Forward ToWidget commands aimed at the outer chrome to the
+            // inner text box (skips the forwarded copy itself).
+            if message.direction() == MessageDirection::ToWidget
+                && message.destination() != self.command_target
+            {
+                ui.send(self.command_target, text_msg.clone());
+                return;
+            }
+            if message.direction() != MessageDirection::FromWidget {
+                return;
+            }
+            if let Some(TextMessage::Text(text)) = message.data::<TextMessage>() {
+                if let Some(callback) = &self.on_change {
+                    callback(ui, text);
+                }
             }
         }
     }
@@ -93,12 +107,11 @@ impl TextArea {
 
     /// Builds the text area, adds it to the UI and registers its handlers.
     pub fn build(self, cx: &mut BuildCx) -> Component {
-        let widget_builder = WidgetBuilder::new()
-            .with_name("raikou_text_area")
-            .with_margin(to_fyrox_thickness(self.margin))
-            .with_height(24.0 * self.rows as f32);
+        let theme = cx.theme().clone();
 
-        let handle = {
+        let inner = {
+            let widget_builder = WidgetBuilder::new().with_name("raikou_text_area_inner");
+
             let mut ctx = cx.ctx();
             TextBoxBuilder::new(widget_builder)
                 .with_text(&self.text)
@@ -108,13 +121,32 @@ impl TextArea {
                 .to_base()
         };
 
+        let handle = {
+            let mut ctx = cx.ctx();
+            crate::field::field_chrome(
+                &mut ctx,
+                &theme,
+                inner,
+                24.0 * self.rows as f32,
+                self.margin,
+            )
+        };
+
         let component = Component {
             handle,
             kind: ComponentKind::TextArea(TextAreaHandlers {
-                on_change: self.on_change,
+                on_change: self.on_change.clone(),
+                command_target: inner,
             }),
         };
         cx.register(&component);
+        cx.register(&Component {
+            handle: inner,
+            kind: ComponentKind::TextArea(TextAreaHandlers {
+                on_change: self.on_change,
+                command_target: inner,
+            }),
+        });
         component
     }
 }

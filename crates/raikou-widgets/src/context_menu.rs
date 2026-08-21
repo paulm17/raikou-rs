@@ -112,21 +112,45 @@ impl ContextMenu {
                 .with_name("raikou_context_menu")
                 .with_margin(to_fyrox_thickness(self.margin)),
         );
-        let context_menu = ContextMenuBuilder::new(popup).build(&mut ctx);
-        let handle: Handle<UiNode> = context_menu.to_base();
+        // Canonical fyrox pattern: the popup hosts a StackPanel of items as
+        // its content; build_popup wraps it in a styled body Border.
+        let handle: Handle<UiNode> = {
+            let items_panel = {
+                let mut wb = fyrox::gui::widget::WidgetBuilder::new().with_name("raikou_context_menu_items");
+                for item in &items {
+                    wb = wb.with_child(*item);
+                }
+                let mut ctx2 = cx.ctx();
+                fyrox::gui::stack_panel::StackPanelBuilder::new(wb).build(&mut ctx2)
+            };
+            let popup = popup.with_content(items_panel);
+            ContextMenuBuilder::new(popup).build(&mut cx.ctx()).to_base()
+        };
 
-        // Attach items to the popup's content via the parent menu item wiring.
-        if !items.is_empty() {
-            ctx.link(items[0], handle);
+        // Fluent styling for the popup body + every item decorator.
+        {
+            let theme = cx.theme().clone();
+            crate::menu::style_menu_chrome(cx.ui(), &theme, &[handle]);
+            // BISECT2: per-item loop disabled
+            // for item in &item_handles {
+            //     crate::menu::style_menu_chrome(cx.ui(), &theme, std::slice::from_ref(item));
+            // }
         }
 
         let kind = ComponentKind::ContextMenu(ContextMenuHandlers {
-            item_handles,
+            item_handles: item_handles.clone(),
             on_item_click: self.on_item_click,
         });
-        let component = Component { handle, kind };
-        cx.register(&component);
-        component
+        // Clicks target individual item handles, so the handlers must be
+        // reachable from every item destination, not just the popup root.
+        cx.register(&Component { handle, kind: kind.clone() });
+        for item in &item_handles {
+            cx.register(&Component {
+                handle: *item,
+                kind: kind.clone(),
+            });
+        }
+        Component { handle, kind }
     }
 }
 

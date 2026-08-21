@@ -93,11 +93,24 @@ fn build_demo_panel(
         .build(&mut cx);
 
     // --- preview content ---------------------------------------------------
-    let value_label: Handle<UiNode> = Label::new("50%")
-        .font_size(24.0)
-        .color(primary)
-        .build(&mut cx)
-        .into();
+    // Raw Text node with explicit center text-alignment: the StackPanel hands
+    // children full-width cells, so glyph centering must come from the Text
+    // itself rather than widget alignment.
+    let value_label: Handle<UiNode> = {
+        use fyrox::gui::text::TextBuilder;
+        let mut ctx = cx.ctx();
+        TextBuilder::new(
+            fyrox::gui::widget::WidgetBuilder::new()
+                .with_name("raikou_value_text")
+                .with_foreground(Brush::Solid(to_fyrox_color(primary)).into()),
+        )
+        .with_text("50%")
+        .with_font(ctx.default_font())
+        .with_font_size(24.0.into())
+        .with_horizontal_text_alignment(fyrox::gui::HorizontalAlignment::Center)
+        .build(&mut ctx)
+        .to_base()
+    };
 
     let bubble: Handle<UiNode> = BoxWidget::new()
         .width(Length::Fixed(64.0))
@@ -118,6 +131,19 @@ fn build_demo_panel(
         })
         .build(&mut cx);
     let slider_handle: Handle<UiNode> = slider.into();
+
+    // Centre every demo element inside the preview stage.
+    {
+        use fyrox::gui::message::UiMessage;
+        use fyrox::gui::widget::WidgetMessage;
+        for handle in [bubble, value_label.into(), slider_handle] {
+            cx.ui().send_message(
+                UiMessage::for_widget(handle, WidgetMessage::HorizontalAlignment(
+                    fyrox::gui::HorizontalAlignment::Center,
+                )),
+            );
+        }
+    }
 
     let preview_content: Handle<UiNode> = Stack::new()
         .spacing(16.0)

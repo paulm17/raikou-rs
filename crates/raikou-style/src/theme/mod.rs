@@ -5,6 +5,8 @@
 
 pub mod button_style;
 pub mod control_theme;
+pub mod fluent;
+pub mod fyrox_bridge;
 pub mod provider;
 pub mod tokens;
 pub mod variant;
@@ -232,6 +234,16 @@ impl Theme {
         let mut theme = Self::default_dark();
         theme.variant = ThemeVariant::Dark;
         theme
+    }
+
+    /// The Avalonia Fluent light theme.
+    pub fn fluent_light() -> Self {
+        fluent::fluent_light()
+    }
+
+    /// The Avalonia Fluent dark theme.
+    pub fn fluent_dark() -> Self {
+        fluent::fluent_dark()
     }
 
     /// Looks up a semantic color token by name, resolving aliases.

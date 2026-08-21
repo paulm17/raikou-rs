@@ -7,3 +7,4 @@ rust-version.workspace = true
 [dependencies]
 raikou-core.workspace = true
 smol_str.workspace = true
+fyrox.workspace = true

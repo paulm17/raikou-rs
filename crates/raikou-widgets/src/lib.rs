@@ -14,6 +14,7 @@ pub mod combobox;
 pub mod component;
 pub mod context_menu;
 pub mod convert;
+pub mod field;
 pub mod group;
 pub mod image;
 pub mod label_widget;

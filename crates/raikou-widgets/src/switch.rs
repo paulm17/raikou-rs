@@ -1,21 +1,26 @@
 //! The Switch component.
 //!
-//! Maps onto fyrox's `ToggleButtonBuilder` and reports state through an
-//! `on_change` handler.
+//! A Fluent-style toggle switch: a pill-shaped 40x20 track whose knob slides
+//! between the ends, with an optional label rendered beside the track. Maps
+//! onto fyrox's `ToggleButton` so state flows through `ToggleButtonMessage`.
 
 use std::rc::Rc;
 
 use fyrox::core::pool::Handle;
-use fyrox::gui::message::UiMessage;
+use fyrox::gui::border::Border;
+use fyrox::gui::brush::Brush;
+use fyrox::gui::decorator::{Decorator, DecoratorMessage};
+use fyrox::gui::message::{MessageDirection, UiMessage};
 use fyrox::gui::toggle::{ToggleButtonBuilder, ToggleButtonMessage};
-use fyrox::gui::widget::WidgetBuilder;
-use fyrox::gui::{UiNode, UserInterface};
+use fyrox::gui::widget::{WidgetMessage, WidgetBuilder};
+use fyrox::gui::{HorizontalAlignment, UiNode, UserInterface, VerticalAlignment};
+use fyrox::gui::Thickness as FyroxThickness;
 
 use raikou_core::Thickness;
 
 use crate::build_cx::BuildCx;
 use crate::component::{Component, ComponentKind};
-use crate::convert::to_fyrox_thickness;
+use crate::convert::{to_fyrox_color, to_fyrox_thickness};
 
 type ChangeCallback = dyn Fn(&mut UserInterface, bool);
 
@@ -24,12 +29,31 @@ type ChangeCallback = dyn Fn(&mut UserInterface, bool);
 pub struct SwitchHandlers {
     /// Invoked with the new toggled state whenever the switch flips.
     pub on_change: Option<Rc<ChangeCallback>>,
+    /// Track widget that receives forwarded commands.
+    pub command_target: Handle<UiNode>,
+    /// Sliding knob node kept in sync with the toggled state.
+    pub knob: Handle<UiNode>,
 }
 
 impl SwitchHandlers {
     /// Routes a UI message to the matching handler.
     pub fn dispatch(&self, ui: &mut UserInterface, message: &UiMessage) {
         if let Some(ToggleButtonMessage::Toggled(state)) = message.data::<ToggleButtonMessage>() {
+            if message.direction() == MessageDirection::ToWidget {
+                if message.destination() != self.command_target {
+                    ui.send(self.command_target, ToggleButtonMessage::Toggled(*state));
+                }
+                return;
+            }
+            // Keep the knob on the correct side of the track.
+            ui.send(
+                self.knob,
+                WidgetMessage::HorizontalAlignment(if *state {
+                    HorizontalAlignment::Right
+                } else {
+                    HorizontalAlignment::Left
+                }),
+            );
             if let Some(callback) = &self.on_change {
                 callback(ui, *state);
             }
@@ -92,37 +116,167 @@ impl Switch {
 
     /// Builds the switch, adds it to the UI and registers its handlers.
     pub fn build(self, cx: &mut BuildCx) -> Component {
-        let label_handle: Handle<UiNode> = {
+        use fyrox::graph::SceneGraph;
+
+        let theme = cx.theme().clone();
+
+        // Pill-shaped interactive track.
+        let track = {
+            let mut ctx = cx.ctx();
+            ToggleButtonBuilder::new(
+                WidgetBuilder::new()
+                    .with_name("raikou_switch_track")
+                    .with_width(40.0)
+                    .with_height(20.0)
+                    .with_vertical_alignment(VerticalAlignment::Center),
+            )
+            .with_toggled(self.toggled)
+            .build(&mut ctx)
+            .to_base()
+        };
+
+        {
+            let ui = cx.ui();
+            // Round the decorator border into a pill and give the off state a
+            // subtle outline; the selected (on) brush comes from the global
+            // style bridge (accent).
+            if let Some(decorator_handle) = ui.node(track).children().first().copied() {
+                if let Ok(border) = ui.try_get_mut_of_type::<Border>(decorator_handle) {
+                    *border.corner_radius = 10.0f32.into();
+                }
+                if let Ok(decorator) = ui.try_get_mut_of_type::<Decorator>(decorator_handle) {
+                    let off_fill = theme
+                        .color("surface.panel")
+                        .unwrap_or(raikou_core::Color::new(1.0, 1.0, 1.0, 1.0));
+                    let off_stroke = theme
+                        .color("border.default")
+                        .unwrap_or(raikou_core::Color::new(0.0, 0.0, 0.0, 0.4));
+                    *decorator.border.stroke_thickness = FyroxThickness::uniform(1.0).into();
+                    // NormalBrush both stores the brush and re-applies it as
+                    // the widget background while the decorator is unselected.
+                    ui.send(
+                        decorator_handle,
+                        DecoratorMessage::NormalBrush(Brush::Solid(to_fyrox_color(off_fill)).into()),
+                    );
+                    ui.send(
+                        decorator_handle,
+                        WidgetMessage::Foreground(Brush::Solid(to_fyrox_color(off_stroke)).into()),
+                    );
+                }
+            }
+        }
+
+        // Knob: small white circle hugging one end of the track.
+        // Fluent knobs are white in both themes (the track provides contrast),
+        // with a subtle outline for definition on light tracks.
+        let knob_fill = raikou_core::Color::new(1.0, 1.0, 1.0, 1.0);
+        let knob: Handle<UiNode> = {
+            let mut ctx = cx.ctx();
+            fyrox::gui::border::BorderBuilder::new(
+                WidgetBuilder::new()
+                    .with_name("raikou_switch_knob")
+                    .with_width(14.0)
+                    .with_height(14.0)
+                    .with_margin(FyroxThickness::uniform(2.5))
+                    .with_horizontal_alignment(if self.toggled {
+                        HorizontalAlignment::Right
+                    } else {
+                        HorizontalAlignment::Left
+                    })
+                    .with_vertical_alignment(VerticalAlignment::Center),
+            )
+            .with_corner_radius(7.0f32.into())
+            .with_stroke_thickness(FyroxThickness::uniform(1.0f32).into())
+            .build(&mut ctx)
+            .to_base()
+        };
+        cx.ui().send(
+            knob,
+            WidgetMessage::Background(Brush::Solid(to_fyrox_color(knob_fill)).into()),
+        );
+        cx.ui().send(
+            knob,
+            WidgetMessage::Foreground(
+                Brush::Solid(to_fyrox_color(
+                    theme.color("border.subtle").unwrap_or(raikou_core::Color::new(0.0, 0.0, 0.0, 0.2)),
+                ))
+                .into(),
+            ),
+        );
+        // Place the knob inside the decorator border so it clips to the pill.
+        if let Some(decorator_handle) = cx.ui().node(track).children().first().copied() {
+            cx.ctx().link(knob, decorator_handle);
+        }
+
+        // Optional label beside the track.
+        let label_handle: Option<Handle<UiNode>> = if self.label.is_empty() {
+            None
+        } else {
             let mut ctx = cx.ctx();
             let font = ctx.default_font();
-            fyrox::gui::text::TextBuilder::new(WidgetBuilder::new())
-                .with_text(&self.label)
-                .with_font(font)
-                .build(&mut ctx)
-                .to_base()
+            let fg = theme.color("text.primary").unwrap_or(raikou_core::Color::new(0.0, 0.0, 0.0, 1.0));
+            let text = fyrox::gui::text::TextBuilder::new(
+                WidgetBuilder::new()
+                    .with_margin(to_fyrox_thickness(Thickness::new(8.0, 0.0, 0.0, 0.0)))
+                    .with_vertical_alignment(VerticalAlignment::Center),
+            )
+            .with_text(&self.label)
+            .with_font(font)
+            .build(&mut ctx)
+            .to_base();
+            cx.ui().send(text, WidgetMessage::Foreground(Brush::Solid(to_fyrox_color(fg)).into()));
+            Some(text)
         };
 
-        let widget_builder = WidgetBuilder::new()
-            .with_name("raikou_switch")
-            .with_margin(to_fyrox_thickness(self.margin));
-
-        let handle = {
-            let mut ctx = cx.ctx();
-            ToggleButtonBuilder::new(widget_builder)
-                .with_toggled(self.toggled)
-                .with_content(label_handle)
+        let outer: Handle<UiNode> = match label_handle {
+            Some(label) => {
+                use fyrox::gui::stack_panel::StackPanelBuilder;
+                use fyrox::gui::Orientation;
+                let mut ctx = cx.ctx();
+                StackPanelBuilder::new(
+                    WidgetBuilder::new()
+                        .with_name("raikou_switch")
+                        .with_margin(to_fyrox_thickness(self.margin))
+                        .with_child(track)
+                        .with_child(label),
+                )
+                .with_orientation(Orientation::Horizontal)
                 .build(&mut ctx)
                 .to_base()
+            }
+            None => {
+                use fyrox::gui::stack_panel::StackPanelBuilder;
+                let mut ctx = cx.ctx();
+                StackPanelBuilder::new(
+                    WidgetBuilder::new()
+                        .with_name("raikou_switch")
+                        .with_child(track),
+                )
+                .build(&mut ctx)
+                .to_base()
+            }
         };
 
-        let component = Component {
-            handle,
+        let kind = ComponentKind::Switch(SwitchHandlers {
+            on_change: None,
+            command_target: track,
+            knob,
+        });
+        let component_outer = Component {
+            handle: outer,
+            kind: kind.clone(),
+        };
+        let component_inner = Component {
+            handle: track,
             kind: ComponentKind::Switch(SwitchHandlers {
-                on_change: self.on_change,
+                on_change: self.on_change.clone(),
+                command_target: track,
+                knob,
             }),
         };
-        cx.register(&component);
-        component
+        cx.register(&component_outer);
+        cx.register(&component_inner);
+        component_outer
     }
 }
 

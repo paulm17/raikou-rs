@@ -18,6 +18,7 @@ use std::sync::Arc;
 
 use fyrox::asset::{io::FsResourceIo, manager::ResourceManager};
 use fyrox::core::algebra::{Matrix3, Vector2};
+use fyrox::core::color::Color;
 use fyrox::core::pool::Handle;
 use fyrox::core::task::TaskPool;
 use fyrox::dpi::PhysicalSize;
@@ -35,6 +36,9 @@ use fyrox::gui::{RenderMode, UiNode, UserInterface};
 use fyrox::utils::translate_event;
 use fyrox::window::WindowAttributes;
 use raikou::prelude::*;
+
+#[cfg(target_os = "macos")]
+mod screenshot;
 
 /// Configuration for a demo window.
 pub struct Options {
@@ -104,7 +108,20 @@ pub fn run(options: Options, build: Box<PanelBuilder>) {
     }
 
     let mut registry = ComponentRegistry::default();
-    let theme = Theme::light();
+    // RAIKOU_THEME=light|dark selects the Avalonia Fluent variant (default: light).
+    let theme = match std::env::var("RAIKOU_THEME").as_deref() {
+        Ok("dark") => Theme::fluent_dark(),
+        _ => Theme::fluent_light(),
+    };
+    {
+        // Map the theme onto fyrox's global style so all natively-styled
+        // widgets (text boxes, dropdowns, decorators...) inherit Fluent
+        // colors instead of the stock dark palette.
+        use raikou_style::theme::fyrox_bridge::fluent_fyrox_style_resource;
+        engine.user_interfaces.first_mut().set_style(
+            fluent_fyrox_style_resource(&theme, matches!(std::env::var("RAIKOU_THEME").as_deref(), Ok("dark"))),
+        );
+    }
     let panel = build(engine.user_interfaces.first_mut(), &theme, &mut registry);
     {
         let ui = engine.user_interfaces.first_mut();
@@ -114,11 +131,35 @@ pub fn run(options: Options, build: Box<PanelBuilder>) {
         ui.need_render = true;
     }
 
+    // Screenshot-harness support: exit automatically after N seconds so
+    // scripts/shot.sh can capture a window without killing the process.
+    let auto_quit_secs: Option<f32> = std::env::var("RAIKOU_AUTO_QUIT_SECS")
+        .ok()
+        .and_then(|v| v.parse().ok());
+    let started = std::time::Instant::now();
+
+    // In-process self-capture (no Screen Recording permission needed):
+    // RAIKOU_SHOT_OUT=<path.png> writes a PNG of the window at
+    // RAIKOU_SHOT_AT_SECS (default 2.0) after launch.
+    let shot_out = std::env::var("RAIKOU_SHOT_OUT").ok();
+    let shot_at: f32 = std::env::var("RAIKOU_SHOT_AT_SECS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(2.0);
+    let mut shot_done = false;
+
     let event_loop = EventLoop::new().unwrap();
 
     event_loop
         .run(move |event, active_event_loop| {
             active_event_loop.set_control_flow(ControlFlow::Wait);
+
+            if let Some(secs) = auto_quit_secs {
+                if started.elapsed().as_secs_f32() >= secs {
+                    active_event_loop.exit();
+                    return;
+                }
+            }
 
             match event {
                 Event::Resumed => {
@@ -209,9 +250,40 @@ pub fn run(options: Options, build: Box<PanelBuilder>) {
                             ui.need_render = true;
                         }
                         WindowEvent::RedrawRequested => {
-                            let ui = engine.user_interfaces.first();
-                            if ui.need_render {
+                            let need_render = engine.user_interfaces.first().need_render;
+                            if need_render {
                                 engine.render().unwrap();
+                            }
+
+                            // The last rendered frame persists on-screen, so
+                            // capture even when this frame didn't re-render.
+                            if !shot_done && started.elapsed().as_secs_f32() >= shot_at {
+                                shot_done = true;
+                                if let Some(path) = &shot_out {
+                                    if let GraphicsContext::Initialized(ctx) =
+                                        &mut engine.graphics_context
+                                    {
+                                        let size = ctx.window.inner_size();
+                                        let clear = match std::env::var("RAIKOU_THEME")
+                                            .as_deref()
+                                        {
+                                            Ok("dark") => Color::from_rgba(0x20, 0x20, 0x20, 255),
+                                            _ => Color::WHITE,
+                                        };
+                                        let ui = engine.user_interfaces.first();
+                                        if let Err(e) = screenshot::capture_ui_to_png(
+                                            &mut ctx.renderer,
+                                            ui,
+                                            &engine.resource_manager,
+                                            size.width,
+                                            size.height,
+                                            clear,
+                                            path,
+                                        ) {
+                                            eprintln!("screenshot failed: {e}");
+                                        }
+                                    }
+                                }
                             }
                         }
                         _ => {}

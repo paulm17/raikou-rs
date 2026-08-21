@@ -10,3 +10,5 @@ path = "src/lib.rs"
 [dependencies]
 fyrox.workspace = true
 raikou.workspace = true
+raikou-style.workspace = true
+image = "0.25"

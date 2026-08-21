@@ -35,6 +35,7 @@ use fyrox::gui::{Control, UiNode, UserInterface};
 
 use raikou::prelude::*;
 use raikou::{to_fyrox_color, Color};
+use raikou_style::Theme;
 
 /// Caps a size to a finite working bound. Root canvases measure their children
 /// with an unbounded available size; using it directly would propagate infinite
@@ -44,6 +45,11 @@ fn bounded(v: Vector2<f32>) -> Vector2<f32> {
         if v.x.is_finite() { v.x } else { 4096.0 },
         if v.y.is_finite() { v.y } else { 4096.0 },
     )
+}
+
+/// Resolves a theme color token, falling back to `fallback` when missing.
+fn token(theme: &Theme, name: &str, fallback: Color) -> FyroxColor {
+    to_fyrox_color(theme.color(name).unwrap_or(fallback))
 }
 
 // ---------------------------------------------------------------------------
@@ -64,6 +70,9 @@ pub struct PlaygroundShellControl {
     code_height: f32,
     outer_padding: f32,
     gap: f32,
+    page_bg: FyroxColor,
+    card_fill: FyroxColor,
+    card_border: FyroxColor,
 }
 
 fyrox::gui::define_widget_deref!(PlaygroundShellControl);
@@ -155,7 +164,7 @@ impl Control for PlaygroundShellControl {
         drawing_context.push_rect_filled(&bounds, None);
         drawing_context.commit(
             self.clip_bounds(),
-            Brush::Solid(to_fyrox_color(Color::new(0.96, 0.96, 0.97, 1.0))),
+            Brush::Solid(self.page_bg),
             CommandTexture::None,
             &self.material,
             None,
@@ -179,18 +188,18 @@ impl Control for PlaygroundShellControl {
         );
 
         for card in [preview_card, controls_card] {
-            drawing_context.push_rounded_rect_filled(&card, 14.0, 12);
+            drawing_context.push_rounded_rect_filled(&card, 8.0, 12);
             drawing_context.commit(
                 self.clip_bounds(),
-                Brush::Solid(to_fyrox_color(Color::new(1.0, 1.0, 1.0, 1.0))),
+                Brush::Solid(self.card_fill),
                 CommandTexture::None,
                 &self.material,
                 None,
             );
-            drawing_context.push_rounded_rect(&card, 1.0, 14.0, 12);
+            drawing_context.push_rounded_rect(&card, 1.0, 8.0, 12);
             drawing_context.commit(
                 self.clip_bounds(),
-                Brush::Solid(to_fyrox_color(Color::new(0.85, 0.86, 0.88, 1.0))),
+                Brush::Solid(self.card_border),
                 CommandTexture::None,
                 &self.material,
                 None,
@@ -267,6 +276,11 @@ impl PlaygroundShell {
 
     /// Builds the shell, adds it to the UI and registers its handlers.
     pub fn build(self, cx: &mut BuildCx) -> Component {
+        let theme = cx.theme().clone();
+        let page_bg = token(&theme, "surface.panel", Color::new(0.95, 0.95, 0.95, 1.0));
+        let card_fill = token(&theme, "surface.elevated", Color::new(1.0, 1.0, 1.0, 1.0));
+        let card_border = token(&theme, "border.subtle", Color::new(0.0, 0.0, 0.0, 0.14));
+
         let controls: Handle<UiNode> = {
             let mut ctx = cx.ctx();
             ScrollViewerBuilder::new(WidgetBuilder::new())
@@ -292,6 +306,9 @@ impl PlaygroundShell {
                 code_height: self.code_height,
                 outer_padding: self.outer_padding,
                 gap: self.gap,
+                page_bg,
+                card_fill,
+                card_border,
             };
             ctx.add(control).transmute()
         };
@@ -342,7 +359,12 @@ impl Control for PlaygroundPreviewControl {
             .min(inner_height)
             .max(1.0);
         ui.measure_node(self.child, Vector2::new(child_width, child_height));
-        available_size
+        // Hug the measured content instead of claiming all available space.
+        let desired = ui.nodes().borrow(self.child).desired_size();
+        Vector2::new(
+            (desired.x + self.padding * 2.0).min(available_size.x),
+            (desired.y + self.padding * 2.0).min(available_size.y),
+        )
     }
 
     fn arrange_override(&self, ui: &UserInterface, final_size: Vector2<f32>) -> Vector2<f32> {
@@ -402,6 +424,8 @@ pub struct PlaygroundPreview {
     stage_color: FyroxColor,
     border_color: FyroxColor,
     radius: f32,
+    stage_color_explicit: bool,
+    border_color_explicit: bool,
 }
 
 impl PlaygroundPreview {
@@ -414,7 +438,9 @@ impl PlaygroundPreview {
             max_height: None,
             stage_color: to_fyrox_color(Color::new(0.97, 0.98, 1.0, 1.0)),
             border_color: to_fyrox_color(Color::new(0.86, 0.88, 0.92, 1.0)),
-            radius: 18.0,
+            radius: 8.0,
+            stage_color_explicit: false,
+            border_color_explicit: false,
         }
     }
 
@@ -434,16 +460,18 @@ impl PlaygroundPreview {
     /// Sets the stage card fill color.
     pub fn stage_color(mut self, color: impl Into<Color>) -> Self {
         self.stage_color = to_fyrox_color(color.into());
+        self.stage_color_explicit = true;
         self
     }
 
     /// Sets the stage card border color.
     pub fn border_color(mut self, color: impl Into<Color>) -> Self {
         self.border_color = to_fyrox_color(color.into());
+        self.border_color_explicit = true;
         self
     }
 
-    /// Sets the stage card corner radius (default 18).
+    /// Sets the stage card corner radius (default 8).
     pub fn radius(mut self, radius: f32) -> Self {
         self.radius = radius.max(0.0);
         self
@@ -451,6 +479,22 @@ impl PlaygroundPreview {
 
     /// Builds the preview stage, adds it to the UI and registers its handlers.
     pub fn build(self, cx: &mut BuildCx) -> Component {
+        let theme = cx.theme().clone();
+        let stage_color = if self.stage_color_explicit {
+            self.stage_color
+        } else {
+            token(&theme, "surface.elevated", Color::new(1.0, 1.0, 1.0, 1.0))
+        };
+        let border_color = if self.border_color_explicit {
+            self.border_color
+        } else {
+            token(
+                &theme,
+                "fluent.transient.border",
+                Color::new(0.0, 0.0, 0.0, 0.14),
+            )
+        };
+
         let handle: Handle<UiNode> = {
             let mut ctx = cx.ctx();
             let control = PlaygroundPreviewControl {
@@ -462,9 +506,9 @@ impl PlaygroundPreview {
                 padding: self.padding,
                 max_width: self.max_width,
                 max_height: self.max_height,
-                stage_color: self.stage_color,
-                border_color: self.border_color,
-                radius: self.radius,
+                stage_color,
+                border_color,
+                radius: self.radius.min(8.0),
             };
             ctx.add(control).transmute()
         };
@@ -495,6 +539,11 @@ pub struct PlaygroundCodePanelControl {
     title_text: Handle<UiNode>,
     scroll: Handle<UiNode>,
     height: f32,
+    card_fill: FyroxColor,
+    card_border: FyroxColor,
+    divider: FyroxColor,
+    pill_fill: FyroxColor,
+    pill_border: FyroxColor,
 }
 
 fyrox::gui::define_widget_deref!(PlaygroundCodePanelControl);
@@ -503,17 +552,28 @@ impl Control for PlaygroundCodePanelControl {
     fn measure_override(&self, ui: &UserInterface, available_size: Vector2<f32>) -> Vector2<f32> {
         let available_size = bounded(available_size);
         let panel_height = self.height.min(available_size.y);
-        let body_height = (panel_height - 49.0).max(0.0);
+        let body_height = (panel_height - 69.0).max(0.0);
         ui.measure_node(self.title_text, Vector2::new(104.0, 22.0));
-        ui.measure_node(self.scroll, Vector2::new(available_size.x, body_height));
+        ui.measure_node(
+            self.scroll,
+            Vector2::new((available_size.x - 40.0).max(1.0), body_height),
+        );
         Vector2::new(available_size.x, panel_height)
     }
 
     fn arrange_override(&self, ui: &UserInterface, final_size: Vector2<f32>) -> Vector2<f32> {
         let final_size = bounded(final_size);
-        let body_height = (final_size.y - 49.0).max(0.0);
+        let body_height = (final_size.y - 69.0).max(0.0);
         ui.arrange_node(self.title_text, &Rect::new(28.0, 15.0, 104.0, 22.0));
-        ui.arrange_node(self.scroll, &Rect::new(0.0, 49.0, final_size.x, body_height));
+        ui.arrange_node(
+            self.scroll,
+            &Rect::new(
+                20.0,
+                59.0,
+                (final_size.x - 40.0).max(1.0),
+                body_height,
+            ),
+        );
         final_size
     }
 
@@ -521,18 +581,18 @@ impl Control for PlaygroundCodePanelControl {
         let bounds = self.widget.bounding_rect();
 
         // Card background + border.
-        drawing_context.push_rounded_rect_filled(&bounds, 14.0, 12);
+        drawing_context.push_rounded_rect_filled(&bounds, 8.0, 12);
         drawing_context.commit(
             self.clip_bounds(),
-            Brush::Solid(to_fyrox_color(Color::new(1.0, 1.0, 1.0, 1.0))),
+            Brush::Solid(self.card_fill),
             CommandTexture::None,
             &self.material,
             None,
         );
-        drawing_context.push_rounded_rect(&bounds, 1.0, 14.0, 12);
+        drawing_context.push_rounded_rect(&bounds, 1.0, 8.0, 12);
         drawing_context.commit(
             self.clip_bounds(),
-            Brush::Solid(to_fyrox_color(Color::new(0.85, 0.86, 0.88, 1.0))),
+            Brush::Solid(self.card_border),
             CommandTexture::None,
             &self.material,
             None,
@@ -542,7 +602,7 @@ impl Control for PlaygroundCodePanelControl {
         drawing_context.push_rect_filled(&Rect::new(0.0, 48.0, bounds.size.x, 1.0), None);
         drawing_context.commit(
             self.clip_bounds(),
-            Brush::Solid(to_fyrox_color(Color::new(0.89, 0.90, 0.92, 1.0))),
+            Brush::Solid(self.divider),
             CommandTexture::None,
             &self.material,
             None,
@@ -550,18 +610,18 @@ impl Control for PlaygroundCodePanelControl {
 
         // Title pill.
         let pill = Rect::new(16.0, 12.0, 120.0, 28.0);
-        drawing_context.push_rounded_rect_filled(&pill, 10.0, 12);
+        drawing_context.push_rounded_rect_filled(&pill, 6.0, 12);
         drawing_context.commit(
             self.clip_bounds(),
-            Brush::Solid(to_fyrox_color(Color::new(0.98, 0.98, 0.99, 1.0))),
+            Brush::Solid(self.pill_fill),
             CommandTexture::None,
             &self.material,
             None,
         );
-        drawing_context.push_rounded_rect(&pill, 1.0, 10.0, 12);
+        drawing_context.push_rounded_rect(&pill, 1.0, 6.0, 12);
         drawing_context.commit(
             self.clip_bounds(),
-            Brush::Solid(to_fyrox_color(Color::new(0.86, 0.87, 0.90, 1.0))),
+            Brush::Solid(self.pill_border),
             CommandTexture::None,
             &self.material,
             None,
@@ -599,9 +659,19 @@ impl PlaygroundCodePanel {
 
     /// Builds the code panel, adds it to the UI and registers its handlers.
     pub fn build(self, cx: &mut BuildCx) -> Component {
+        let theme = cx.theme().clone();
+        let title_color = theme
+            .color("text.secondary")
+            .unwrap_or(Color::new(0.14, 0.16, 0.19, 1.0));
+        let card_fill = token(&theme, "surface.elevated", Color::new(1.0, 1.0, 1.0, 1.0));
+        let card_border = token(&theme, "border.subtle", Color::new(0.0, 0.0, 0.0, 0.14));
+        let divider = token(&theme, "border.subtle", Color::new(0.0, 0.0, 0.0, 0.10));
+        let pill_fill = token(&theme, "surface.panel", Color::new(0.98, 0.98, 0.99, 1.0));
+        let pill_border = token(&theme, "border.subtle", Color::new(0.0, 0.0, 0.0, 0.12));
+
         let title_text: Handle<UiNode> = Label::new(&self.title)
             .font_size(13.0)
-            .color(Color::new(0.14, 0.16, 0.19, 1.0))
+            .color(title_color)
             .build(cx)
             .into();
 
@@ -626,6 +696,11 @@ impl PlaygroundCodePanel {
                 title_text,
                 scroll,
                 height: self.height,
+                card_fill,
+                card_border,
+                divider,
+                pill_fill,
+                pill_border,
             };
             ctx.add(control).transmute()
         };
@@ -657,9 +732,17 @@ impl PlaygroundCodeBlock {
 
     /// Builds the code block text node and adds it to the UI.
     pub fn build(self, cx: &mut BuildCx) -> Handle<UiNode> {
+        let fg = cx
+            .theme()
+            .color("text.primary")
+            .unwrap_or(Color::new(0.1, 0.1, 0.1, 1.0));
         let mut ctx = cx.ctx();
-        TextBuilder::new(WidgetBuilder::new().with_name("raikou_code"))
-            .with_text(&(self.code)())
+        TextBuilder::new(
+            WidgetBuilder::new()
+                .with_name("raikou_code")
+                .with_foreground(Brush::Solid(to_fyrox_color(fg)).into()),
+        )
+        .with_text(&(self.code)())
         .build(&mut ctx)
         .to_base()
     }
@@ -689,10 +772,18 @@ pub fn control_slider() -> Slider {
 
 /// Builds a `Stack` of a heading followed by explanatory note lines.
 pub fn playground_notes(cx: &mut BuildCx, title: impl Into<String>, lines: &[&str]) -> Stack {
+    let theme = cx.theme().clone();
+    let title_color = theme
+        .color("text.primary")
+        .unwrap_or(Color::new(0.12, 0.14, 0.17, 1.0));
+    let line_color = theme
+        .color("text.muted")
+        .unwrap_or(Color::new(0.34, 0.39, 0.46, 1.0));
+
     let mut notes = Stack::new().spacing(10.0).child(
         Label::new(title)
             .font_size(20.0)
-            .color(Color::new(0.12, 0.14, 0.17, 1.0))
+            .color(title_color)
             .build(cx),
     );
 
@@ -700,7 +791,7 @@ pub fn playground_notes(cx: &mut BuildCx, title: impl Into<String>, lines: &[&st
         notes = notes.child(
             Label::new(*line)
                 .font_size(13.0)
-                .color(Color::new(0.34, 0.39, 0.46, 1.0))
+                .color(line_color)
                 .build(cx),
         );
     }

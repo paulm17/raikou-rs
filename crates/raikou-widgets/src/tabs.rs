@@ -7,7 +7,7 @@
 use std::rc::Rc;
 
 use fyrox::core::pool::Handle;
-use fyrox::gui::message::UiMessage;
+use fyrox::gui::message::{MessageDirection, UiMessage};
 use fyrox::gui::tab_control::{TabControlBuilder, TabControlMessage, TabDefinition};
 use fyrox::gui::text::TextBuilder;
 use fyrox::gui::widget::WidgetBuilder;
@@ -35,6 +35,9 @@ pub struct TabsHandlers {
 impl TabsHandlers {
     /// Routes a UI message to the matching handler.
     pub fn dispatch(&self, ui: &mut UserInterface, message: &UiMessage) {
+        if message.direction() != MessageDirection::FromWidget {
+            return;
+        }
         if let Some(TabControlMessage::ActiveTab(Some(uuid))) = message.data::<TabControlMessage>() {
             if let Some(index) = self.uuids.iter().position(|u| u == uuid) {
                 if let Some(callback) = &self.on_change {

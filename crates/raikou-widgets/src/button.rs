@@ -315,12 +315,17 @@ impl Button {
         let mut widget_builder = WidgetBuilder::new()
             .with_name("raikou_button")
             .with_margin(to_fyrox_thickness(self.margin))
+            .with_foreground(Brush::Solid(to_fyrox_color(style.text)).into())
             .with_background(Brush::Solid(to_fyrox_color(Color::TRANSPARENT)).into());
         if let Some(width) = self.width.resolve() {
             widget_builder = widget_builder.with_width(width);
         }
         if let Some(height) = self.height.resolve() {
             widget_builder = widget_builder.with_height(height);
+        } else {
+            // Fluent controls have fixed heights per size; this also stops
+            // stretchy parents inflating the measured height.
+            widget_builder = widget_builder.with_height(self.size.min_height());
         }
         if self.padding != Thickness::ZERO {
             widget_builder = widget_builder.with_min_size(fyrox::core::algebra::Vector2::new(
