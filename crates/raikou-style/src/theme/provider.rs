@@ -3,10 +3,10 @@
 //! Theme providers supply token values and component recipes to the
 //! style resolution system. They can be scoped to subtrees.
 
-use crate::Theme;
 use crate::property::Shadow;
 use crate::recipe::{ComponentRecipe, RecipeKey};
 use crate::style_value::TokenScale;
+use crate::Theme;
 use raikou_core::Color;
 use std::sync::Arc;
 

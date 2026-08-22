@@ -15,7 +15,11 @@ fn menu_bar_reports_leaf_clicks() {
         MenuBar::new()
             .menu(
                 "File",
-                vec![MenuItem::new("New"), MenuItem::new("Open"), MenuItem::new("Exit")],
+                vec![
+                    MenuItem::new("New"),
+                    MenuItem::new("Open"),
+                    MenuItem::new("Exit"),
+                ],
             )
             .menu("Help", vec![MenuItem::new("About")])
             .on_item_click(move |_, i| s.set(i))
@@ -58,6 +62,49 @@ fn context_menu_reports_item_clicks() {
     h.ui.post(items[1], MenuItemMessage::Click);
     h.pump();
     assert_eq!(seen.get(), 1, "clicking 'Copy' must report index 1");
+}
+
+#[test]
+fn menu_bar_ignores_disabled_item_clicks() {
+    let mut h = Harness::new();
+    let seen = std::rc::Rc::new(std::cell::Cell::new(usize::MAX));
+    let s = seen.clone();
+    h.build(move |cx| {
+        MenuBar::new()
+            .menu(
+                "File",
+                vec![
+                    MenuItem::new("New"),
+                    MenuItem::new("Delete").disabled(),
+                    MenuItem::new("Exit"),
+                ],
+            )
+            .on_item_click(move |_, i| s.set(i))
+            .build(cx)
+    });
+
+    use fyrox::graph::SceneGraph;
+    let items = collect_menu_items(&h.ui);
+    assert_eq!(items.len(), 3);
+
+    // Let the queued Enabled/brush messages land before asserting.
+    h.pump();
+    assert!(
+        !h.ui.try_get(items[1]).unwrap().enabled(),
+        "disabled item must be disabled in the graph"
+    );
+
+    h.ui.post(items[1], MenuItemMessage::Click);
+    h.pump();
+    assert_eq!(
+        seen.get(),
+        usize::MAX,
+        "disabled item must not report clicks"
+    );
+
+    h.ui.post(items[2], MenuItemMessage::Click);
+    h.pump();
+    assert_eq!(seen.get(), 2, "enabled sibling must still report clicks");
 }
 
 /// Collects all menu item widget handles in node-creation order (popups are

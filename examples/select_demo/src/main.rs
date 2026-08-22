@@ -15,12 +15,10 @@ fn build_demo_panel(
 ) -> Handle<UiNode> {
     let mut cx = BuildCx::new(ui, theme, registry);
 
-    let status: Handle<UiNode> = TextBuilder::new(
-        WidgetBuilder::new().with_name("raikou_status"),
-    )
-    .with_text("no interaction yet")
-    .build(&mut cx.ctx())
-    .to_base();
+    let status: Handle<UiNode> = TextBuilder::new(WidgetBuilder::new().with_name("raikou_status"))
+        .with_text("no interaction yet")
+        .build(&mut cx.ctx())
+        .to_base();
 
     let select = Select::new()
         .items(vec!["Crimson", "Teal", "Gold", "Slate"])
@@ -28,7 +26,10 @@ fn build_demo_panel(
         .placeholder("Pick a color...")
         .margin(Thickness::new(0.0, 0.0, 0.0, 16.0))
         .on_change(move |ui, index| {
-            ui.send(status, TextMessage::Text(format!("selected -> index {index}")));
+            ui.send(
+                status,
+                TextMessage::Text(format!("selected -> index {index}")),
+            );
         })
         .build(&mut cx);
     let select_handle: Handle<UiNode> = select.into();
@@ -40,7 +41,11 @@ fn build_demo_panel(
     let heading_handle: Handle<UiNode> = heading.into();
 
     let hint = Label::new("Open the dropdown and pick a color.")
-        .color(theme.color("text.muted").unwrap_or(Color::new(0.4, 0.4, 0.4, 1.0)))
+        .color(
+            theme
+                .color("text.muted")
+                .unwrap_or(Color::new(0.4, 0.4, 0.4, 1.0)),
+        )
         .build(&mut cx);
     let hint_handle: Handle<UiNode> = hint.into();
 

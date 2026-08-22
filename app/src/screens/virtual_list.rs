@@ -158,11 +158,11 @@ impl VirtualList {
             .and_then(|node| node.cast::<ScrollViewer>())
         {
             scroll_panel = viewer.scroll_panel.transmute();
-            if let Some(content_node) = ui.nodes().try_get(viewer.content).ok() {
-                rows = content_node.children().iter().copied().collect();
+            if let Ok(content_node) = ui.nodes().try_get(viewer.content) {
+                rows = content_node.children().to_vec();
                 let content_height = content_node.height();
                 if let Some(first) = rows.first() {
-                    if let Some(row_node) = ui.nodes().try_get(*first).ok() {
+                    if let Ok(row_node) = ui.nodes().try_get(*first) {
                         let h = row_node.height();
                         if h > 0.0 {
                             row_height = h;

@@ -5,7 +5,7 @@ mod common;
 use common::Harness;
 use fyrox::graph::SceneGraph;
 use fyrox::gui::popup::Popup;
-use raikou_widgets::{show_popover, hide_popover, Button, Popover};
+use raikou_widgets::{hide_popover, show_popover, Button, Popover};
 
 #[test]
 fn popover_open_close_roundtrip() {

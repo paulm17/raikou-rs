@@ -3,10 +3,12 @@
 mod common;
 
 use common::Harness;
-use fyrox::graph::SceneGraph;
 use fyrox::asset::untyped::ResourceKind;
 use fyrox::core::uuid::Uuid;
-use fyrox::gui::texture::{TextureKind, TexturePixelKind, TextureResource, TextureResourceExtension};
+use fyrox::graph::SceneGraph;
+use fyrox::gui::texture::{
+    TextureKind, TexturePixelKind, TextureResource, TextureResourceExtension,
+};
 use raikou_core::ImageFit;
 use raikou_widgets::{set_image_fit, set_image_texture, Image};
 
@@ -38,7 +40,10 @@ fn image_helpers_update_state() {
     // set_image_texture accepts an optional texture (from_bytes yields one).
     let texture = TextureResource::from_bytes(
         Uuid::new_v4(),
-        TextureKind::Rectangle { width: 2, height: 2 },
+        TextureKind::Rectangle {
+            width: 2,
+            height: 2,
+        },
         TexturePixelKind::RGBA8,
         vec![64; 16],
         ResourceKind::Embedded,

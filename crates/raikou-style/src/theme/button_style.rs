@@ -14,9 +14,10 @@ use crate::style::Style;
 use crate::Theme;
 
 /// Visual appearance of a button.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum ButtonVariant {
     /// Solid accent fill.
+    #[default]
     Filled,
     /// Transparent fill with an accent border.
     Outline,
@@ -38,12 +39,6 @@ impl ButtonVariant {
             ButtonVariant::Subtle => "subtle",
             ButtonVariant::Link => "link",
         }
-    }
-}
-
-impl Default for ButtonVariant {
-    fn default() -> Self {
-        Self::Filled
     }
 }
 
@@ -91,8 +86,12 @@ impl Theme {
             .resolve_component_style(&key, &variants, &WidgetState::new().pressed())
             .unwrap_or_default();
 
-        let fallback_bg = self.color("surface.panel").unwrap_or(Color::new(0.97, 0.97, 0.98, 1.0));
-        let fallback_text = self.color("text.primary").unwrap_or(Color::new(0.09, 0.09, 0.10, 1.0));
+        let fallback_bg = self
+            .color("surface.panel")
+            .unwrap_or(Color::new(0.97, 0.97, 0.98, 1.0));
+        let fallback_text = self
+            .color("text.primary")
+            .unwrap_or(Color::new(0.09, 0.09, 0.10, 1.0));
 
         let background = style_color(&idle, box_style::BACKGROUND, fallback_bg);
         let text = style_color(&idle, text_style::COLOR, fallback_text);
@@ -209,4 +208,3 @@ mod tests {
         assert!(approx(large.padding.left, 16.0));
     }
 }
-

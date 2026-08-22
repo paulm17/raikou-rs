@@ -44,9 +44,7 @@ pub use button::{Button, ButtonHandle, ClickMode};
 pub use checkbox::{Checkbox, CheckboxHandle};
 pub use combobox::{Combobox, ComboboxHandle};
 pub use component::{ClickEvent, Component, ComponentKind};
-pub use context_menu::{
-    hide_context_menu, show_context_menu, ContextMenu, ContextMenuHandle,
-};
+pub use context_menu::{hide_context_menu, show_context_menu, ContextMenu, ContextMenuHandle};
 pub use convert::{to_fyrox_color, to_fyrox_gradient, to_fyrox_thickness};
 pub use group::{Group, GroupHandle};
 pub use image::{set_image_fit, set_image_texture, Image, ImageHandle};
@@ -68,4 +66,4 @@ pub use tabs::{Tabs, TabsHandle};
 pub use text_area::{TextArea, TextAreaHandle};
 pub use text_input::{TextInput, TextInputHandle};
 pub use theme_scope::{ThemeScope, ThemeScopeHandle};
-pub use tree::{Tree, TreeNode, TreeHandle};
+pub use tree::{Tree, TreeHandle, TreeNode};

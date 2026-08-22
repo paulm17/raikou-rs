@@ -17,19 +17,10 @@ use raikou::Color;
 use raikou_playground::*;
 
 /// Shared demo state mutated by the control handlers.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 struct PlaygroundState {
     open: bool,
     dark_theme: bool,
-}
-
-impl Default for PlaygroundState {
-    fn default() -> Self {
-        Self {
-            open: false,
-            dark_theme: false,
-        }
-    }
 }
 
 /// Generates the source shown in the code panel for the current state.
@@ -62,8 +53,7 @@ pub fn popover_panel(
     // The code generator is created first so every handler can refresh the
     // code panel through it.
     let code_state = Rc::clone(&state);
-    let code_fn: Rc<dyn Fn() -> String> =
-        Rc::new(move || build_code(&code_state.borrow().clone()));
+    let code_fn: Rc<dyn Fn() -> String> = Rc::new(move || build_code(&code_state.borrow().clone()));
 
     let code_fn_for_block = Rc::clone(&code_fn);
     let code_handle = PlaygroundCodeBlock::new(move || code_fn_for_block()).build(&mut cx);
@@ -168,7 +158,11 @@ pub fn popover_panel(
         .child(
             Label::new("Open")
                 .font_size(12.0)
-                .color(theme.color("text.muted").unwrap_or(Color::new(0.4, 0.4, 0.4, 1.0)))
+                .color(
+                    theme
+                        .color("text.muted")
+                        .unwrap_or(Color::new(0.4, 0.4, 0.4, 1.0)),
+                )
                 .build(&mut cx),
         )
         .child(open_switch)

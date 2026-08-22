@@ -56,7 +56,7 @@ fn checkerboard() -> Vec<u8> {
     let mut pixels = Vec::with_capacity(size * size * 4);
     for y in 0..size {
         for x in 0..size {
-            let on = (x / cell + y / cell) % 2 == 0;
+            let on = (x / cell + y / cell).is_multiple_of(2);
             let v = if on { 235 } else { 32 };
             pixels.push(v);
             pixels.push(v);
@@ -91,8 +91,7 @@ fn build_texture_row(
     }
 
     let images_rc = Rc::new(RefCell::new(images));
-    let images_handles: Vec<Handle<UiNode>> =
-        images_rc.borrow().iter().map(|c| c.handle).collect();
+    let images_handles: Vec<Handle<UiNode>> = images_rc.borrow().iter().map(|c| c.handle).collect();
 
     let mut fit_buttons = Group::new().spacing(8.0);
     for (label, fit) in [
@@ -147,7 +146,11 @@ pub fn image_panel(
 
     let shell = Stack::new()
         .spacing(24.0)
-        .child(Label::new("Image playground").font_size(22.0).build(&mut cx))
+        .child(
+            Label::new("Image playground")
+                .font_size(22.0)
+                .build(&mut cx),
+        )
         .child(section_wide)
         .child(section_tall)
         .child(section_check)

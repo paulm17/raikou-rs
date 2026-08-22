@@ -3,9 +3,9 @@ use std::sync::{Arc, RwLock};
 
 use smol_str::SmolStr;
 
-use crate::Style;
 use crate::recipe::{ComponentRecipe, VariantMap};
 use crate::state::WidgetState;
+use crate::Style;
 
 #[derive(Clone, Debug)]
 pub struct ControlTheme {

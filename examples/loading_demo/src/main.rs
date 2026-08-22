@@ -7,18 +7,11 @@ use raikou::prelude::*;
 use raikou::{Color, Thickness};
 use raikou_demo::Options;
 
-fn mode_row(
-    cx: &mut BuildCx,
-    label: &str,
-    mode: LoadingIndicatorMode,
-) -> Handle<UiNode> {
+fn mode_row(cx: &mut BuildCx, label: &str, mode: LoadingIndicatorMode) -> Handle<UiNode> {
     let name = Label::new(label)
         .color(Color::new(0.09, 0.09, 0.10, 1.0))
         .build(cx);
-    let spinner = LoadingIndicator::new()
-        .mode(mode)
-        .size(28.0)
-        .build(cx);
+    let spinner = LoadingIndicator::new().mode(mode).size(28.0).build(cx);
     Group::new()
         .spacing(12.0)
         .child(name)
@@ -41,7 +34,11 @@ fn build_demo_panel(
     let heading_handle: Handle<UiNode> = heading.into();
 
     let sub = Label::new("All nine animation modes")
-        .color(theme.color("text.muted").unwrap_or(Color::new(0.4, 0.4, 0.4, 1.0)))
+        .color(
+            theme
+                .color("text.muted")
+                .unwrap_or(Color::new(0.4, 0.4, 0.4, 1.0)),
+        )
         .build(&mut cx);
     let sub_handle: Handle<UiNode> = sub.into();
 
@@ -68,10 +65,7 @@ fn build_demo_panel(
         .into();
 
     // A button in a loading state (label replaced by a Pulse spinner).
-    let loading_button = Button::new()
-        .text("Save")
-        .is_loading(true)
-        .build(&mut cx);
+    let loading_button = Button::new().text("Save").is_loading(true).build(&mut cx);
     let loading_button_handle: Handle<UiNode> = loading_button.into();
 
     // A button with a custom child widget (a small Ring spinner) as content.
@@ -95,7 +89,11 @@ fn build_demo_panel(
         .into();
 
     let section = Label::new("Buttons: loading state and custom content")
-        .color(theme.color("text.muted").unwrap_or(Color::new(0.4, 0.4, 0.4, 1.0)))
+        .color(
+            theme
+                .color("text.muted")
+                .unwrap_or(Color::new(0.4, 0.4, 0.4, 1.0)),
+        )
         .build(&mut cx);
     let section_handle: Handle<UiNode> = section.into();
 

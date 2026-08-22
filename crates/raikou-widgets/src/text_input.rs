@@ -9,7 +9,7 @@ use std::rc::Rc;
 use fyrox::core::pool::Handle;
 use fyrox::gui::message::{MessageDirection, UiMessage};
 use fyrox::gui::text::TextMessage;
-use fyrox::gui::text_box::{EmptyTextPlaceholder, TextCommitMode, TextBoxBuilder};
+use fyrox::gui::text_box::{EmptyTextPlaceholder, TextBoxBuilder, TextCommitMode};
 use fyrox::gui::widget::WidgetBuilder;
 use fyrox::gui::{UiNode, UserInterface};
 
@@ -112,8 +112,7 @@ impl TextInput {
 
         // Inner text box: Avalonia TextControl padding (10, 6, 6, 5).
         let inner = {
-            let widget_builder =
-                WidgetBuilder::new().with_name("raikou_text_input_inner");
+            let widget_builder = WidgetBuilder::new().with_name("raikou_text_input_inner");
 
             let placeholder = self.placeholder.clone();
             let mut ctx = cx.ctx();
@@ -127,7 +126,8 @@ impl TextInput {
                     bottom: 5.0,
                 });
             if !placeholder.is_empty() {
-                builder = builder.with_empty_text_placeholder(EmptyTextPlaceholder::Text(&placeholder));
+                builder =
+                    builder.with_empty_text_placeholder(EmptyTextPlaceholder::Text(&placeholder));
             }
             builder.build(&mut ctx).to_base()
         };

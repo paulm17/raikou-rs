@@ -109,9 +109,8 @@ impl LoadingIndicatorControl {
     ) {
         let radius = (self.size / 2.0 - self.stroke_width).max(0.0);
         let rotation = (self.animation_time * 360.0) % 360.0;
-        let angles: Range<f32> =
-            ((start_fraction * 360.0 + rotation).to_radians())
-                ..((start_fraction + sweep_fraction) * 360.0 + rotation).to_radians();
+        let angles: Range<f32> = ((start_fraction * 360.0 + rotation).to_radians())
+            ..((start_fraction + sweep_fraction) * 360.0 + rotation).to_radians();
         drawing_context.push_arc(center, radius, angles, 32, self.stroke_width);
         self.commit_solid(drawing_context);
     }
@@ -211,14 +210,11 @@ impl LoadingIndicatorControl {
         for i in 0..3 {
             let x = center.x + (i as f32 - 1.0) * spacing * 0.5;
             let offset = i as f32 * 0.15;
-            let bounce = (((self.animation_time + offset) % 0.6) / 0.6 * PI).sin().abs();
+            let bounce = (((self.animation_time + offset) % 0.6) / 0.6 * PI)
+                .sin()
+                .abs();
             let y = center.y - bounce * (self.size / 5.0);
-            drawing_context.push_circle_filled(
-                Vector2::new(x, y),
-                self.size / 9.0,
-                12,
-                self.color,
-            );
+            drawing_context.push_circle_filled(Vector2::new(x, y), self.size / 9.0, 12, self.color);
             self.commit_white(drawing_context);
         }
     }
@@ -228,7 +224,9 @@ impl LoadingIndicatorControl {
         let spacing = bar_width * 1.5;
         for i in 0..5 {
             let offset = i as f32 * 0.12;
-            let wave = (((self.animation_time + offset) % 0.8) / 0.8 * PI).sin().abs();
+            let wave = (((self.animation_time + offset) % 0.8) / 0.8 * PI)
+                .sin()
+                .abs();
             let height = self.size * (0.25 + 0.55 * wave);
             let x = center.x + (i as f32 - 2.0) * spacing;
             let y = center.y - height / 2.0;
@@ -428,7 +426,7 @@ impl LoadingIndicator {
                 .with_width(width)
                 .with_height(height)
                 .with_margin(to_fyrox_thickness(builder.padding))
-                .build(&mut cx.ctx()),
+                .build(&cx.ctx()),
             mode: builder.mode,
             color: to_fyrox_color(builder.color),
             size: builder.size,

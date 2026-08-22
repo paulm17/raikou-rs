@@ -3,15 +3,17 @@
 use std::rc::Rc;
 
 use fyrox::core::pool::Handle;
-use fyrox::gui::dropdown_list::{DropdownListBuilder, DropdownListMessage};
+use fyrox::gui::brush::Brush;
+use fyrox::gui::dropdown_list::{DropdownList, DropdownListBuilder, DropdownListMessage};
 use fyrox::gui::message::{MessageDirection, UiMessage};
-use fyrox::gui::widget::WidgetBuilder;
+use fyrox::gui::widget::{WidgetBuilder, WidgetMessage};
 use fyrox::gui::{UiNode, UserInterface};
 
 use raikou_core::Thickness;
 
 use crate::build_cx::BuildCx;
 use crate::component::{Component, ComponentKind};
+use crate::convert::to_fyrox_color;
 
 type ChangeCallback = dyn Fn(&mut UserInterface, usize);
 
@@ -21,6 +23,8 @@ pub struct SelectHandlers {
     on_change: Option<Rc<ChangeCallback>>,
     /// The inner dropdown list that receives programmatic commands.
     command_target: Handle<UiNode>,
+    /// Muted text shown when nothing is selected (if any).
+    placeholder: Option<Handle<UiNode>>,
 }
 
 impl SelectHandlers {
@@ -36,6 +40,12 @@ impl SelectHandlers {
             }
             if message.direction() != MessageDirection::FromWidget {
                 return;
+            }
+            // Flip the placeholder with the selection state.
+            if let (Some(placeholder), Some(DropdownListMessage::Selection(selected))) =
+                (&self.placeholder, message.data::<DropdownListMessage>())
+            {
+                ui.send(*placeholder, WidgetMessage::Visibility(selected.is_none()));
             }
             if let Some(on_change) = &self.on_change {
                 if let Some(DropdownListMessage::Selection(Some(index))) =
@@ -137,6 +147,43 @@ impl Select {
             builder.build(&mut ctx).to_base()
         };
 
+        // Nothing selected: plant a muted placeholder text into the inner
+        // dropdown's content grid; handlers flip its visibility with the
+        // selection state. An empty placeholder string means none.
+        let placeholder = if self.selected.is_none() && !self.placeholder.is_empty() {
+            let main_grid = {
+                use fyrox::graph::SceneGraph;
+                cx.ui()
+                    .try_get_of_type::<DropdownList>(inner)
+                    .ok()
+                    .filter(|dd| dd.current.is_none())
+                    .map(|dd| *dd.main_grid)
+            };
+            main_grid.map(|grid| {
+                let mut ctx = cx.ctx();
+                let font = ctx.default_font();
+                let fallback_muted = raikou_core::Color::new(0.45, 0.45, 0.45, 1.0);
+                let muted = Brush::Solid(to_fyrox_color(
+                    theme.color("text.muted").unwrap_or(fallback_muted),
+                ));
+                let text: Handle<UiNode> = fyrox::gui::text::TextBuilder::new(
+                    WidgetBuilder::new()
+                        .on_row(0)
+                        .on_column(0)
+                        .with_vertical_alignment(fyrox::gui::VerticalAlignment::Center)
+                        .with_foreground(muted.into()),
+                )
+                .with_text(&self.placeholder)
+                .with_font(font)
+                .build(&mut ctx)
+                .to_base();
+                ctx.link(text, grid);
+                text
+            })
+        } else {
+            None
+        };
+
         let handle = {
             let mut ctx = cx.ctx();
             crate::field::field_chrome(
@@ -153,6 +200,7 @@ impl Select {
             kind: ComponentKind::Select(SelectHandlers {
                 on_change: self.on_change.clone(),
                 command_target: inner,
+                placeholder,
             }),
         };
         cx.register(&component);
@@ -163,6 +211,7 @@ impl Select {
             kind: ComponentKind::Select(SelectHandlers {
                 on_change: self.on_change,
                 command_target: inner,
+                placeholder,
             }),
         });
         component

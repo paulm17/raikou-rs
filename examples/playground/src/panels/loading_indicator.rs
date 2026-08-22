@@ -106,7 +106,6 @@ pub fn loading_indicator_panel(
 
     let preview = PlaygroundPreview::new(preview_content)
         .content_max_size(420.0, 180.0)
-        .stage_color(Color::new(0.95, 0.97, 1.0, 1.0))
         .build(&mut cx);
 
     let notes = playground_notes(

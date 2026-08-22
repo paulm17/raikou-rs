@@ -91,6 +91,10 @@ impl Label {
 pub type LabelHandle = Handle<UiNode>;
 
 /// Helper to update a built label's text at runtime.
-pub fn set_label_text(ui: &fyrox::gui::UserInterface, label: Handle<UiNode>, text: impl Into<String>) {
+pub fn set_label_text(
+    ui: &fyrox::gui::UserInterface,
+    label: Handle<UiNode>,
+    text: impl Into<String>,
+) {
     ui.send(label, TextMessage::Text(text.into()));
 }

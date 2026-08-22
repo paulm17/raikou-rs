@@ -10,17 +10,13 @@ use raikou_widgets::{set_label_text, BoxWidget, Group, Label, Stack};
 #[test]
 fn label_builds_and_updates_text() {
     let mut h = Harness::new();
-    let label = h.build(|cx| {
-        Label::new("Hello")
-            .font_size(16.0)
-            .build(cx)
-    });
+    let label = h.build(|cx| Label::new("Hello").font_size(16.0).build(cx));
 
     set_label_text(&h.ui, label.handle, "World");
     h.pump();
 
-    use fyrox::gui::text::Text;
     use fyrox::graph::SceneGraph;
+    use fyrox::gui::text::Text;
     let text = h.ui.node(label.handle).cast::<Text>().unwrap();
     assert_eq!(text.text(), "World", "set_label_text must update the text");
 }

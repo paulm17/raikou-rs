@@ -95,8 +95,7 @@ pub fn checkbox_panel(
     let state = Rc::new(RefCell::new(PlaygroundState::default()));
 
     let code_state = Rc::clone(&state);
-    let code_fn: Rc<dyn Fn() -> String> =
-        Rc::new(move || build_code(&code_state.borrow().clone()));
+    let code_fn: Rc<dyn Fn() -> String> = Rc::new(move || build_code(&code_state.borrow().clone()));
 
     let code_fn_for_block = Rc::clone(&code_fn);
     let code_handle = PlaygroundCodeBlock::new(move || code_fn_for_block()).build(&mut cx);
@@ -207,13 +206,33 @@ pub fn checkbox_panel(
                 .color(primary)
                 .build(&mut cx),
         )
-        .child(Label::new("Label").font_size(12.0).color(muted).build(&mut cx))
+        .child(
+            Label::new("Label")
+                .font_size(12.0)
+                .color(muted)
+                .build(&mut cx),
+        )
         .child(label_input)
-        .child(Label::new("Color").font_size(12.0).color(muted).build(&mut cx))
+        .child(
+            Label::new("Color")
+                .font_size(12.0)
+                .color(muted)
+                .build(&mut cx),
+        )
         .child(color_select)
-        .child(Label::new("Size").font_size(12.0).color(muted).build(&mut cx))
+        .child(
+            Label::new("Size")
+                .font_size(12.0)
+                .color(muted)
+                .build(&mut cx),
+        )
         .child(size_slider)
-        .child(Label::new("Radius").font_size(12.0).color(muted).build(&mut cx))
+        .child(
+            Label::new("Radius")
+                .font_size(12.0)
+                .color(muted)
+                .build(&mut cx),
+        )
         .child(radius_slider)
         .child(checked_switch)
         .child(disabled_switch)

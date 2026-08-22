@@ -22,13 +22,11 @@ fn slider_value_message_invokes_callback() {
             .build(cx)
     });
 
-    h.ui.send(
-        slider.handle,
-        ScrollBarMessage::Value(50.0),
-    );
+    h.ui.send(slider.handle, ScrollBarMessage::Value(50.0));
     h.pump();
     assert_eq!(
-        seen.get(), 50.0,
+        seen.get(),
+        50.0,
         "ScrollBarMessage::Value must forward to on_change"
     );
 }
@@ -39,11 +37,18 @@ fn slider_ignores_foreign_messages() {
     let changes = Counter::new();
     let c = changes.clone();
     let slider = h.build(move |cx| {
-        Slider::new().min(0.0).max(1.0).on_change(move |_, _| c.bump()).build(cx)
+        Slider::new()
+            .min(0.0)
+            .max(1.0)
+            .on_change(move |_, _| c.bump())
+            .build(cx)
     });
 
     // A message for a different destination must not reach the handler.
-    h.ui.send(h.ui.root(), fyrox::gui::scroll_viewer::ScrollViewerMessage::VerticalScroll(0.5));
+    h.ui.send(
+        h.ui.root(),
+        fyrox::gui::scroll_viewer::ScrollViewerMessage::VerticalScroll(0.5),
+    );
     // (sent to the UI root, not the slider)
     h.pump();
     assert_eq!(changes.get(), 0);

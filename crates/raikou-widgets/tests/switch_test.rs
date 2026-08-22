@@ -79,7 +79,10 @@ fn find_track(
         if h.is_none() {
             continue;
         }
-        if ui.try_get_of_type::<fyrox::gui::toggle::ToggleButton>(h).is_ok() {
+        if ui
+            .try_get_of_type::<fyrox::gui::toggle::ToggleButton>(h)
+            .is_ok()
+        {
             return h;
         }
         for child in ui.node(h).children() {

@@ -35,17 +35,30 @@ pub fn context_menu_panel(
         .child(
             Label::new("Context target area")
                 .font_size(14.0)
-                .color(Color::new(0.35, 0.40, 0.47, 1.0))
+                .color(
+                    theme
+                        .color("text.muted")
+                        .unwrap_or(Color::new(0.4, 0.4, 0.4, 1.0)),
+                )
                 .build(&mut cx),
         )
         .child(
             BoxWidget::new()
                 .width(260.0)
                 .height(84.0)
-                .color(Color::new(0.89, 0.94, 0.99, 1.0))
+                .color(
+                    theme
+                        .color("surface.subtle")
+                        .or_else(|| theme.color("surface.elevated"))
+                        .unwrap_or(Color::new(0.97, 0.97, 0.98, 1.0)),
+                )
                 .corner_radius(16.0)
                 .border_width(1.0)
-                .border_color(Color::new(0.68, 0.78, 0.92, 1.0))
+                .border_color(
+                    theme
+                        .color("border.subtle")
+                        .unwrap_or(Color::new(0.0, 0.0, 0.0, 0.14)),
+                )
                 .build(&mut cx),
         )
         .child(menu_handle)

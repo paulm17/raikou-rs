@@ -15,7 +15,11 @@ fn tree_reports_selection_count() {
     let s = seen.clone();
     let tree = h.build(move |cx| {
         Tree::new()
-            .node(TreeNode::new("Root").child(TreeNode::new("Child A")).child(TreeNode::new("Child B")))
+            .node(
+                TreeNode::new("Root")
+                    .child(TreeNode::new("Child A"))
+                    .child(TreeNode::new("Child B")),
+            )
             .on_select(move |_, n| s.set(n))
             .build(cx)
     });

@@ -34,7 +34,11 @@ fn build_demo_panel(
     let heading_handle: Handle<UiNode> = heading.into();
 
     let hint = Label::new("A static grid — headers in the first row, data below.")
-        .color(theme.color("text.muted").unwrap_or(Color::new(0.4, 0.4, 0.4, 1.0)))
+        .color(
+            theme
+                .color("text.muted")
+                .unwrap_or(Color::new(0.4, 0.4, 0.4, 1.0)),
+        )
         .build(&mut cx);
     let hint_handle: Handle<UiNode> = hint.into();
 

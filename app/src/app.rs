@@ -3,13 +3,12 @@ use crate::screens::main_screen::MainScreen;
 use fyrox::{
     asset::{io::FsResourceIo, manager::ResourceManager},
     core::{algebra::Matrix3, task::TaskPool},
-    engine::{Engine, EngineInitParams, GraphicsContext, GraphicsContextParams, SerializationContext},
+    engine::{
+        Engine, EngineInitParams, GraphicsContext, GraphicsContextParams, SerializationContext,
+    },
     gui::{
-        constructor::new_widget_constructor_container,
-        font::BUILT_IN_FONT,
-        message::UiMessage,
-        widget::WidgetMessage,
-        RenderMode, UserInterface,
+        constructor::new_widget_constructor_container, font::BUILT_IN_FONT, message::UiMessage,
+        widget::WidgetMessage, RenderMode, UserInterface,
     },
     window::WindowAttributes,
 };
@@ -118,7 +117,9 @@ impl App {
 
         engine
             .user_interfaces
-            .add(UserInterface::new(fyrox::core::algebra::Vector2::repeat(100.0)));
+            .add(UserInterface::new(fyrox::core::algebra::Vector2::repeat(
+                100.0,
+            )));
 
         Ok(Self {
             engine,

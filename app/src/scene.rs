@@ -47,11 +47,7 @@ impl Scene3D {
             BaseBuilder::new().with_local_transform(
                 TransformBuilder::new()
                     .with_local_position(Vector3::new(0.0, 1.2, 4.0))
-                    .with_local_rotation(UnitQuaternion::from_euler_angles(
-                        0.29,
-                        0.0,
-                        0.0,
-                    ))
+                    .with_local_rotation(UnitQuaternion::from_euler_angles(0.29, 0.0, 0.0))
                     .build(),
             ),
         )
@@ -64,11 +60,7 @@ impl Scene3D {
             BaseBuilder::new().with_local_transform(
                 TransformBuilder::new()
                     .with_local_position(Vector3::new(0.0, 5.0, 0.0))
-                    .with_local_rotation(UnitQuaternion::from_euler_angles(
-                        -1.0,
-                        0.0,
-                        0.0,
-                    ))
+                    .with_local_rotation(UnitQuaternion::from_euler_angles(-1.0, 0.0, 0.0))
                     .build(),
             ),
         ))
@@ -85,19 +77,17 @@ impl Scene3D {
                     .build(),
             ),
         )
-        .with_surfaces(vec![
-            SurfaceBuilder::new(SurfaceResource::new_ok(
-                Uuid::new_v4(),
-                ResourceKind::Embedded,
-                SurfaceData::make_cube(Matrix4::identity()),
-            ))
-            .with_material(MaterialResource::new_ok(
-                Uuid::new_v4(),
-                Default::default(),
-                cube_material,
-            ))
-            .build(),
-        ])
+        .with_surfaces(vec![SurfaceBuilder::new(SurfaceResource::new_ok(
+            Uuid::new_v4(),
+            ResourceKind::Embedded,
+            SurfaceData::make_cube(Matrix4::identity()),
+        ))
+        .with_material(MaterialResource::new_ok(
+            Uuid::new_v4(),
+            Default::default(),
+            cube_material,
+        ))
+        .build()])
         .build(&mut scene.graph)
         .transmute();
 
@@ -143,22 +133,19 @@ impl Scene3D {
     pub fn apply(&mut self, engine: &mut Engine) {
         if let Ok(scene) = engine.scenes.try_get_mut(self.scene) {
             if let Ok(cube) = scene.graph.try_get_mut(self.cube) {
-                cube.local_transform_mut().set_rotation(UnitQuaternion::from_euler_angles(
-                    0.0,
-                    self.angle,
-                    0.0,
-                ));
+                cube.local_transform_mut()
+                    .set_rotation(UnitQuaternion::from_euler_angles(0.0, self.angle, 0.0));
             }
             if let Ok(camera) = scene.graph.try_get_mut(self.camera) {
                 let x = 4.0 * self.orbit_angle.cos();
                 let z = 4.0 * self.orbit_angle.sin();
                 let yaw = self.orbit_angle - std::f32::consts::FRAC_PI_2;
-                camera.local_transform_mut().set_position(Vector3::new(x, 1.2, z));
-                camera.local_transform_mut().set_rotation(UnitQuaternion::from_euler_angles(
-                    0.29,
-                    yaw,
-                    0.0,
-                ));
+                camera
+                    .local_transform_mut()
+                    .set_position(Vector3::new(x, 1.2, z));
+                camera
+                    .local_transform_mut()
+                    .set_rotation(UnitQuaternion::from_euler_angles(0.29, yaw, 0.0));
             }
         }
     }

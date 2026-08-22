@@ -12,9 +12,9 @@ use fyrox::gui::brush::Brush;
 use fyrox::gui::decorator::{Decorator, DecoratorMessage};
 use fyrox::gui::message::{MessageDirection, UiMessage};
 use fyrox::gui::toggle::{ToggleButtonBuilder, ToggleButtonMessage};
-use fyrox::gui::widget::{WidgetMessage, WidgetBuilder};
-use fyrox::gui::{HorizontalAlignment, UiNode, UserInterface, VerticalAlignment};
+use fyrox::gui::widget::{WidgetBuilder, WidgetMessage};
 use fyrox::gui::Thickness as FyroxThickness;
+use fyrox::gui::{HorizontalAlignment, UiNode, UserInterface, VerticalAlignment};
 
 use raikou_core::Thickness;
 
@@ -156,7 +156,9 @@ impl Switch {
                     // the widget background while the decorator is unselected.
                     ui.send(
                         decorator_handle,
-                        DecoratorMessage::NormalBrush(Brush::Solid(to_fyrox_color(off_fill)).into()),
+                        DecoratorMessage::NormalBrush(
+                            Brush::Solid(to_fyrox_color(off_fill)).into(),
+                        ),
                     );
                     ui.send(
                         decorator_handle,
@@ -198,7 +200,9 @@ impl Switch {
             knob,
             WidgetMessage::Foreground(
                 Brush::Solid(to_fyrox_color(
-                    theme.color("border.subtle").unwrap_or(raikou_core::Color::new(0.0, 0.0, 0.0, 0.2)),
+                    theme
+                        .color("border.subtle")
+                        .unwrap_or(raikou_core::Color::new(0.0, 0.0, 0.0, 0.2)),
                 ))
                 .into(),
             ),
@@ -214,7 +218,9 @@ impl Switch {
         } else {
             let mut ctx = cx.ctx();
             let font = ctx.default_font();
-            let fg = theme.color("text.primary").unwrap_or(raikou_core::Color::new(0.0, 0.0, 0.0, 1.0));
+            let fg = theme
+                .color("text.primary")
+                .unwrap_or(raikou_core::Color::new(0.0, 0.0, 0.0, 1.0));
             let text = fyrox::gui::text::TextBuilder::new(
                 WidgetBuilder::new()
                     .with_margin(to_fyrox_thickness(Thickness::new(8.0, 0.0, 0.0, 0.0)))
@@ -224,7 +230,10 @@ impl Switch {
             .with_font(font)
             .build(&mut ctx)
             .to_base();
-            cx.ui().send(text, WidgetMessage::Foreground(Brush::Solid(to_fyrox_color(fg)).into()));
+            cx.ui().send(
+                text,
+                WidgetMessage::Foreground(Brush::Solid(to_fyrox_color(fg)).into()),
+            );
             Some(text)
         };
 

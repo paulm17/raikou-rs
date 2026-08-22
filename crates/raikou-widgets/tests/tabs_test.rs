@@ -40,9 +40,7 @@ fn tabs_header_click_activates_tab() {
     let seen = std::rc::Rc::new(std::cell::Cell::new(usize::MAX));
     let s = seen.clone();
     let tabs = h.build(move |cx| {
-        let mut t = Tabs::new()
-            .initial_tab(0)
-            .on_change(move |_, i| s.set(i));
+        let mut t = Tabs::new().initial_tab(0).on_change(move |_, i| s.set(i));
         for label in ["One", "Two", "Three"] {
             t = t.tab(label, Default::default());
         }

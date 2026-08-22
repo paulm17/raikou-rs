@@ -87,9 +87,7 @@ fn build_code(state: &PlaygroundState) -> String {
     for item in &state.items {
         code.push_str(&format!(
             "// section {:?} — accent: {} (expanded: {})\n",
-            item.label,
-            ACCENTS[item.accent].0,
-            item.expanded
+            item.label, ACCENTS[item.accent].0, item.expanded
         ));
     }
     code
@@ -112,8 +110,7 @@ pub fn accordion_panel(
     let state = Rc::new(RefCell::new(PlaygroundState::default()));
 
     let code_state = Rc::clone(&state);
-    let code_fn: Rc<dyn Fn() -> String> =
-        Rc::new(move || build_code(&code_state.borrow().clone()));
+    let code_fn: Rc<dyn Fn() -> String> = Rc::new(move || build_code(&code_state.borrow().clone()));
 
     let code_fn_for_block = Rc::clone(&code_fn);
     let code_handle = PlaygroundCodeBlock::new(move || code_fn_for_block()).build(&mut cx);
@@ -157,17 +154,16 @@ pub fn accordion_panel(
         };
     }
     let state_toggle = Rc::clone(&state);
-    accordion = accordion
-        .on_toggle(move |_ui, index, expanded| {
-            let mut s = state_toggle.borrow_mut();
-            if !s.allow_multiple && expanded {
-                for (i, it) in s.items.iter_mut().enumerate() {
-                    it.expanded = i == index;
-                }
-            } else if let Some(it) = s.items.get_mut(index) {
-                it.expanded = expanded;
+    accordion = accordion.on_toggle(move |_ui, index, expanded| {
+        let mut s = state_toggle.borrow_mut();
+        if !s.allow_multiple && expanded {
+            for (i, it) in s.items.iter_mut().enumerate() {
+                it.expanded = i == index;
             }
-        });
+        } else if let Some(it) = s.items.get_mut(index) {
+            it.expanded = expanded;
+        }
+    });
     let accordion = accordion.build(&mut cx);
     let accordion_handle: Handle<UiNode> = accordion.into();
 
@@ -207,7 +203,12 @@ pub fn accordion_panel(
                 .color(primary)
                 .build(&mut cx),
         )
-        .child(Label::new("Width").font_size(12.0).color(muted).build(&mut cx))
+        .child(
+            Label::new("Width")
+                .font_size(12.0)
+                .color(muted)
+                .build(&mut cx),
+        )
         .child(width_slider)
         .child(multiple_switch);
 
@@ -259,15 +260,24 @@ pub fn accordion_panel(
                     .build(&mut cx),
             )
             .child(
-                Label::new("Label").font_size(12.0).color(muted).build(&mut cx),
+                Label::new("Label")
+                    .font_size(12.0)
+                    .color(muted)
+                    .build(&mut cx),
             )
             .child(label_input)
             .child(
-                Label::new("Title").font_size(12.0).color(muted).build(&mut cx),
+                Label::new("Title")
+                    .font_size(12.0)
+                    .color(muted)
+                    .build(&mut cx),
             )
             .child(title_input)
             .child(
-                Label::new("Accent").font_size(12.0).color(muted).build(&mut cx),
+                Label::new("Accent")
+                    .font_size(12.0)
+                    .color(muted)
+                    .build(&mut cx),
             )
             .child(accent_select);
         per_section.push(());

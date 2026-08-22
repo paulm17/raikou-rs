@@ -38,9 +38,7 @@ fn step_input_ignores_to_widget_commands() {
     let mut h = Harness::new();
     let changes = Counter::new();
     let c = changes.clone();
-    let input = h.build(move |cx| {
-        StepInput::new().on_change(move |_, _| c.bump()).build(cx)
-    });
+    let input = h.build(move |cx| StepInput::new().on_change(move |_, _| c.bump()).build(cx));
 
     // A ToWidget command is applied by the widget, which echoes one
     // FromWidget report — exactly one callback, not two.

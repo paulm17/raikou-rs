@@ -38,7 +38,8 @@ impl TabsHandlers {
         if message.direction() != MessageDirection::FromWidget {
             return;
         }
-        if let Some(TabControlMessage::ActiveTab(Some(uuid))) = message.data::<TabControlMessage>() {
+        if let Some(TabControlMessage::ActiveTab(Some(uuid))) = message.data::<TabControlMessage>()
+        {
             if let Some(index) = self.uuids.iter().position(|u| u == uuid) {
                 if let Some(callback) = &self.on_change {
                     callback(ui, index);
@@ -145,21 +146,27 @@ impl Tabs {
         // Strip those, give headers transparent/hover/selected brushes and pad
         // the header labels for a comfortable hit target.
         {
+            use fyrox::graph::SceneGraph;
             use fyrox::gui::brush::Brush;
             use fyrox::gui::decorator::DecoratorMessage;
-            use fyrox::graph::SceneGraph;
 
             let theme = cx.theme().clone();
             let token_brush =
                 |name: &str| Brush::Solid(to_fyrox_color(theme.color(name).unwrap())).into();
             let transparent = Brush::Solid(fyrox::core::color::Color::TRANSPARENT);
-            let transparent_prop: fyrox::gui::style::StyledProperty<Brush> = transparent.clone().into();
+            let transparent_prop: fyrox::gui::style::StyledProperty<Brush> =
+                transparent.clone().into();
             let ui = cx.ui();
 
             let root_node = ui.node(handle);
             let border_h = *root_node.children().first().expect("tab control border");
-            let grid_h = *ui.node(border_h).children().first().expect("tab control grid");
-            let headers_h = *ui.node(grid_h)
+            let grid_h = *ui
+                .node(border_h)
+                .children()
+                .first()
+                .expect("tab control grid");
+            let headers_h = *ui
+                .node(grid_h)
                 .children()
                 .first()
                 .expect("headers container");
@@ -182,7 +189,10 @@ impl Tabs {
                     decorator,
                     DecoratorMessage::NormalBrush(transparent_prop.clone()),
                 );
-                ui.send(decorator, DecoratorMessage::HoverBrush(token_brush("fluent.list.low")));
+                ui.send(
+                    decorator,
+                    DecoratorMessage::HoverBrush(token_brush("fluent.list.low")),
+                );
                 ui.send(
                     decorator,
                     DecoratorMessage::PressedBrush(token_brush("fluent.list.medium")),

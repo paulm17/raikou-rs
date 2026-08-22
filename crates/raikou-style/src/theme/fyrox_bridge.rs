@@ -17,7 +17,9 @@ use fyrox::gui::toggle::ToggleButton;
 use fyrox::gui::Thickness;
 
 fn color(theme: &Theme, name: &str) -> FyroxColor {
-    let c = theme.color(name).unwrap_or(raikou_core::Color::new(1.0, 1.0, 1.0, 1.0));
+    let c = theme
+        .color(name)
+        .unwrap_or(raikou_core::Color::new(1.0, 1.0, 1.0, 1.0));
     FyroxColor::from_rgba(
         (c.red * 255.0).round() as u8,
         (c.green * 255.0).round() as u8,
@@ -77,9 +79,17 @@ pub fn fluent_fyrox_style(theme: &Theme, dark: bool) -> Style {
         )
         .set(
             Style::BRUSH_LIGHTEST,
-            solid(theme, "fluent.control.pressed", "fluent.control.pressed", dark),
+            solid(
+                theme,
+                "fluent.control.pressed",
+                "fluent.control.pressed",
+                dark,
+            ),
         )
-        .set(Style::BRUSH_BRIGHT, solid(theme, "accent.solid", "accent.solid", dark))
+        .set(
+            Style::BRUSH_BRIGHT,
+            solid(theme, "accent.solid", "accent.solid", dark),
+        )
         .set(
             Style::BRUSH_BRIGHTEST,
             solid(theme, "slate.12", "slate.1", dark),
@@ -119,10 +129,7 @@ pub fn fluent_fyrox_style(theme: &Theme, dark: bool) -> Style {
             Style::BRUSH_ERROR,
             Brush::Solid(color(theme, "error.solid")),
         )
-        .set(
-            Style::BRUSH_OK,
-            Brush::Solid(color(theme, "success.solid")),
-        );
+        .set(Style::BRUSH_OK, Brush::Solid(color(theme, "success.solid")));
 
     // Decorator state brushes (checkbox interiors, generic hover surfaces...).
     style

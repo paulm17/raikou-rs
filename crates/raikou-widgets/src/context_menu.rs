@@ -4,9 +4,8 @@
 use std::rc::Rc;
 
 use fyrox::core::pool::Handle;
-use fyrox::gui::menu::{
-    ContextMenuBuilder, MenuItemBuilder, MenuItemContent, MenuItemMessage,
-};
+use fyrox::graph::SceneGraph;
+use fyrox::gui::menu::{ContextMenuBuilder, MenuItemBuilder, MenuItemContent, MenuItemMessage};
 use fyrox::gui::message::UiMessage;
 use fyrox::gui::popup::PopupBuilder;
 use fyrox::gui::widget::WidgetBuilder;
@@ -32,9 +31,18 @@ impl ContextMenuHandlers {
     pub fn dispatch(&self, ui: &mut UserInterface, message: &UiMessage) {
         if let Some(on_item_click) = &self.on_item_click {
             if message.data::<MenuItemMessage>() == Some(&MenuItemMessage::Click) {
-                if let Some(index) = self.item_handles.iter().position(|h| *h == message.destination())
+                if let Some(index) = self
+                    .item_handles
+                    .iter()
+                    .position(|h| *h == message.destination())
                 {
-                    on_item_click(ui, index);
+                    let enabled = ui
+                        .try_get(message.destination())
+                        .map(|node| node.enabled())
+                        .unwrap_or(false);
+                    if enabled {
+                        on_item_click(ui, index);
+                    }
                 }
             }
         }
@@ -87,23 +95,31 @@ impl ContextMenu {
     pub fn build(self, cx: &mut BuildCx) -> Component {
         let mut ctx = cx.ctx();
         let mut item_handles: Vec<Handle<UiNode>> = Vec::new();
+        let mut disabled_handles: Vec<Handle<UiNode>> = Vec::new();
 
         let mut items = Vec::new();
         for item in &self.items {
-            let mut builder = MenuItemBuilder::new(
-                WidgetBuilder::new().with_name("raikou_context_menu_item"),
-            )
-            .with_content(MenuItemContent::text(&item.label));
+            let mut builder =
+                MenuItemBuilder::new(WidgetBuilder::new().with_name("raikou_context_menu_item"))
+                    .with_content(MenuItemContent::text(&item.label));
 
             if !item.children.is_empty() {
                 let mut sub_handles = Vec::new();
-                let sub = crate::menu::build_items(&item.children, &mut sub_handles, &mut ctx);
+                let sub = crate::menu::build_items(
+                    &item.children,
+                    &mut sub_handles,
+                    &mut disabled_handles,
+                    &mut ctx,
+                );
                 builder = builder.with_items(sub);
                 item_handles.extend(sub_handles);
             }
 
             let handle = builder.build(&mut ctx);
             item_handles.push(handle.to_base());
+            if !item.enabled {
+                disabled_handles.push(handle.to_base());
+            }
             items.push(handle);
         }
 
@@ -116,7 +132,8 @@ impl ContextMenu {
         // its content; build_popup wraps it in a styled body Border.
         let handle: Handle<UiNode> = {
             let items_panel = {
-                let mut wb = fyrox::gui::widget::WidgetBuilder::new().with_name("raikou_context_menu_items");
+                let mut wb =
+                    fyrox::gui::widget::WidgetBuilder::new().with_name("raikou_context_menu_items");
                 for item in &items {
                     wb = wb.with_child(*item);
                 }
@@ -124,13 +141,15 @@ impl ContextMenu {
                 fyrox::gui::stack_panel::StackPanelBuilder::new(wb).build(&mut ctx2)
             };
             let popup = popup.with_content(items_panel);
-            ContextMenuBuilder::new(popup).build(&mut cx.ctx()).to_base()
+            ContextMenuBuilder::new(popup)
+                .build(&mut cx.ctx())
+                .to_base()
         };
 
         // Fluent styling for the popup body + every item decorator.
         {
             let theme = cx.theme().clone();
-            crate::menu::style_menu_chrome(cx.ui(), &theme, &[handle]);
+            crate::menu::style_menu_chrome(cx.ui(), &theme, &[handle], &disabled_handles);
             // BISECT2: per-item loop disabled
             // for item in &item_handles {
             //     crate::menu::style_menu_chrome(cx.ui(), &theme, std::slice::from_ref(item));
@@ -143,7 +162,10 @@ impl ContextMenu {
         });
         // Clicks target individual item handles, so the handlers must be
         // reachable from every item destination, not just the popup root.
-        cx.register(&Component { handle, kind: kind.clone() });
+        cx.register(&Component {
+            handle,
+            kind: kind.clone(),
+        });
         for item in &item_handles {
             cx.register(&Component {
                 handle: *item,

@@ -5,8 +5,8 @@
 
 use crate::recipe::{ComponentRecipe, RecipeKey};
 use crate::style_value::TokenScale;
-use crate::theme::ThemeProvider as ThemeProviderTrait;
 use crate::theme::provider::{ThemeProvider, ThemeVariant, TokenValue};
+use crate::theme::ThemeProvider as ThemeProviderTrait;
 use std::sync::Arc;
 
 pub struct ThemeVariantScope {

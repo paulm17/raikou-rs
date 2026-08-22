@@ -25,17 +25,11 @@ fn checkbox_check_message_invokes_callback() {
     });
 
     // The dispatcher forwards Check(Some(true)) as on_change(true).
-    h.ui.send(
-        cb.handle,
-        CheckBoxMessage::Check(Some(true)),
-    );
+    h.ui.send(cb.handle, CheckBoxMessage::Check(Some(true)));
     h.pump();
     assert_eq!(changes.get(), 1, "Check(Some(true)) must fire on_change");
 
-    h.ui.send(
-        cb.handle,
-        CheckBoxMessage::Check(Some(false)),
-    );
+    h.ui.send(cb.handle, CheckBoxMessage::Check(Some(false)));
     h.pump();
     assert_eq!(changes.get(), 2, "Check(Some(false)) must fire on_change");
 }
@@ -45,14 +39,9 @@ fn checkbox_none_state_maps_to_false() {
     let mut h = Harness::new();
     let seen = std::rc::Rc::new(std::cell::Cell::new(false));
     let s = seen.clone();
-    let cb = h.build(move |cx| {
-        Checkbox::new().on_change(move |_, v| s.set(v)).build(cx)
-    });
+    let cb = h.build(move |cx| Checkbox::new().on_change(move |_, v| s.set(v)).build(cx));
 
-    h.ui.send(
-        cb.handle,
-        CheckBoxMessage::Check(None),
-    );
+    h.ui.send(cb.handle, CheckBoxMessage::Check(None));
     h.pump();
     assert!(
         !seen.get(),

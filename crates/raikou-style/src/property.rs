@@ -110,23 +110,19 @@ impl<P: StyledProperty> Default for Property<P> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub enum AlignItems {
     Start,
     End,
     Center,
+    #[default]
     Stretch,
     Baseline,
 }
 
-impl Default for AlignItems {
-    fn default() -> Self {
-        Self::Stretch
-    }
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub enum JustifyContent {
+    #[default]
     Start,
     End,
     Center,
@@ -135,28 +131,18 @@ pub enum JustifyContent {
     SpaceEvenly,
 }
 
-impl Default for JustifyContent {
-    fn default() -> Self {
-        Self::Start
-    }
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub enum FlexDirection {
+    #[default]
     Row,
     Column,
     RowReverse,
     ColumnReverse,
 }
 
-impl Default for FlexDirection {
-    fn default() -> Self {
-        Self::Row
-    }
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub enum Cursor {
+    #[default]
     Default,
     Pointer,
     Text,
@@ -166,12 +152,6 @@ pub enum Cursor {
     Help,
     Progress,
     NotAllowed,
-}
-
-impl Default for Cursor {
-    fn default() -> Self {
-        Self::Default
-    }
 }
 
 pub mod layout {
@@ -302,32 +282,22 @@ impl Default for Shadow {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub enum TextAlign {
+    #[default]
     Left,
     Right,
     Center,
     Justify,
 }
 
-impl Default for TextAlign {
-    fn default() -> Self {
-        Self::Left
-    }
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub enum TextDecoration {
+    #[default]
     None,
     Underline,
     Overline,
     LineThrough,
-}
-
-impl Default for TextDecoration {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -337,17 +307,12 @@ pub struct Transition {
     pub easing: Easing,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub enum Easing {
     Linear,
+    #[default]
     Ease,
     EaseIn,
     EaseOut,
     EaseInOut,
-}
-
-impl Default for Easing {
-    fn default() -> Self {
-        Self::Ease
-    }
 }

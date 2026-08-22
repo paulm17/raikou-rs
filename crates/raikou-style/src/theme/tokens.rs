@@ -303,27 +303,27 @@ impl TokenRegistry {
             TokenScale::Color => self
                 .colors
                 .get(name)
-                .map(|c| crate::theme::provider::TokenValue::Color(c)),
+                .map(crate::theme::provider::TokenValue::Color),
             TokenScale::Space => self
                 .space
                 .get(name)
-                .map(|s| crate::theme::provider::TokenValue::F32(s)),
+                .map(crate::theme::provider::TokenValue::F32),
             TokenScale::Size => self
                 .sizes
                 .get(name)
-                .map(|s| crate::theme::provider::TokenValue::F32(s)),
+                .map(crate::theme::provider::TokenValue::F32),
             TokenScale::Radius => self
                 .radii
                 .get(name)
-                .map(|r| crate::theme::provider::TokenValue::F32(r)),
+                .map(crate::theme::provider::TokenValue::F32),
             TokenScale::FontSize => self
                 .typography
                 .get_font_size(name)
-                .map(|s| crate::theme::provider::TokenValue::F32(s)),
+                .map(crate::theme::provider::TokenValue::F32),
             TokenScale::FontWeight => self
                 .typography
                 .get_font_weight(name)
-                .map(|w| crate::theme::provider::TokenValue::F32(w)),
+                .map(crate::theme::provider::TokenValue::F32),
             TokenScale::FontFamily => self
                 .typography
                 .get_font_family(name)
@@ -331,15 +331,15 @@ impl TokenRegistry {
             TokenScale::LineHeight => self
                 .typography
                 .get_line_height(name)
-                .map(|h| crate::theme::provider::TokenValue::F32(h)),
+                .map(crate::theme::provider::TokenValue::F32),
             TokenScale::LetterSpacing => self
                 .typography
                 .get_letter_spacing(name)
-                .map(|s| crate::theme::provider::TokenValue::F32(s)),
+                .map(crate::theme::provider::TokenValue::F32),
             TokenScale::Shadow => self
                 .shadows
                 .get(name)
-                .map(|s| crate::theme::provider::TokenValue::Shadow(s)),
+                .map(crate::theme::provider::TokenValue::Shadow),
             TokenScale::Duration => None,
         }
     }

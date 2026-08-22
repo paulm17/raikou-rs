@@ -8,11 +8,12 @@ use std::fmt::Debug;
 use raikou_core::{Color, Length};
 use smol_str::SmolStr;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub enum StyleValue<T: Clone + Debug + PartialEq> {
     Value(T),
     Token(Token<T>),
     None,
+    #[default]
     Default,
 }
 
@@ -48,12 +49,6 @@ impl<T: Clone + Debug + PartialEq> StyleValue<T> {
             Self::Value(v) => v,
             _ => f(),
         }
-    }
-}
-
-impl<T: Clone + Debug + PartialEq> Default for StyleValue<T> {
-    fn default() -> Self {
-        Self::Default
     }
 }
 
@@ -186,12 +181,13 @@ impl From<f32> for ColorValue {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub enum SizeValue {
     Length(Length),
     Auto,
     Fill,
     Fit,
+    #[default]
     None,
 }
 
@@ -205,26 +201,15 @@ impl SizeValue {
     }
 }
 
-impl Default for SizeValue {
-    fn default() -> Self {
-        Self::None
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub enum SpacingValue {
     Length(Length),
+    #[default]
     None,
 }
 
 impl SpacingValue {
     pub fn px(value: f32) -> Self {
         Self::Length(Length::fixed(value))
-    }
-}
-
-impl Default for SpacingValue {
-    fn default() -> Self {
-        Self::None
     }
 }

@@ -7,7 +7,11 @@ use fyrox::gui::expander::ExpanderMessage;
 use fyrox::gui::message::MessageDirection;
 use raikou_widgets::Accordion;
 
-fn send_expand(h: &mut Harness, handle: fyrox::core::pool::Handle<fyrox::gui::UiNode>, expanded: bool) {
+fn send_expand(
+    h: &mut Harness,
+    handle: fyrox::core::pool::Handle<fyrox::gui::UiNode>,
+    expanded: bool,
+) {
     h.ui.send_message(
         fyrox::gui::message::UiMessage::with_data(ExpanderMessage::Expand(expanded))
             .with_destination(handle)

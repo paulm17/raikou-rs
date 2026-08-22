@@ -10,11 +10,32 @@ use fyrox::gui::{UiNode, UserInterface};
 
 use raikou_core::Thickness;
 
+use crate::accordion::chevron_mark_nodes;
 use crate::build_cx::BuildCx;
 use crate::component::{Component, ComponentKind};
 use crate::convert::to_fyrox_thickness;
 
 type SelectCallback = dyn Fn(&mut UserInterface, usize);
+
+/// One descendant tree's expander: the checkbox handle, its checked state,
+/// the two stock mark handles and the background border that hosts them.
+type ExpanderShape = (
+    fyrox::core::pool::Handle<fyrox::gui::check_box::CheckBox>,
+    bool,
+    Handle<UiNode>,
+    Handle<UiNode>,
+    Handle<UiNode>,
+);
+
+/// An expander mid-swap: checkbox + state, old marks, replacement marks.
+type ExpanderSwap = (
+    fyrox::core::pool::Handle<fyrox::gui::check_box::CheckBox>,
+    bool,
+    Handle<UiNode>,
+    Handle<UiNode>,
+    Handle<UiNode>,
+    Handle<UiNode>,
+);
 
 /// A tree node: a label plus optional children.
 #[derive(Clone, Debug)]
@@ -144,6 +165,105 @@ impl Tree {
         .with_items(root_nodes)
         .build(&mut ctx)
         .to_base();
+
+        // Fluent chevron expanders: fyrox's stock tree expanders use bright
+        // triangle arrows; swap every descendant tree's expander marks for
+        // vector chevrons. Note: trees added after this build are not
+        // restyled (acceptable for static trees).
+        {
+            use fyrox::graph::SceneGraph;
+            use fyrox::gui::check_box::CheckBox;
+            use fyrox::gui::widget::WidgetMessage;
+
+            // Pass 1: collect every descendant tree's expander shape.
+            let expanders: Vec<ExpanderShape> = {
+                let ui = cx.ui();
+                let mut stack = vec![handle];
+                let mut visited = vec![handle];
+                let mut trees: Vec<Handle<UiNode>> = Vec::new();
+                while let Some(h) = stack.pop() {
+                    if h.is_none() {
+                        continue;
+                    }
+                    if ui.try_get_of_type::<fyrox::gui::tree::Tree>(h).is_ok() {
+                        trees.push(h);
+                    }
+                    for child in ui.node(h).children().to_vec() {
+                        if !child.is_none() && !visited.contains(&child) {
+                            visited.push(child);
+                            stack.push(child);
+                        }
+                    }
+                }
+
+                let mut expanders = Vec::new();
+                for tree_handle in trees {
+                    let tree = match ui.try_get_of_type::<fyrox::gui::tree::Tree>(tree_handle) {
+                        Ok(t) => t,
+                        Err(_) => continue,
+                    };
+                    let expander = tree.expander;
+                    let cb_node = ui.node(expander.to_base());
+                    if cb_node.children().len() != 1 {
+                        continue;
+                    }
+                    let grid = cb_node.children()[0];
+                    if ui.node(grid).children().is_empty() {
+                        continue;
+                    }
+                    let background = ui.node(grid).children()[0];
+                    let cb = match ui.try_get_of_type::<CheckBox>(expander.to_base()) {
+                        Ok(c) => c,
+                        Err(_) => continue,
+                    };
+                    expanders.push((
+                        expander,
+                        cb.checked.unwrap_or(false),
+                        *cb.check_mark,
+                        *cb.uncheck_mark,
+                        background,
+                    ));
+                }
+                expanders
+            };
+
+            // Pass 2: build replacement marks and nest them in each host.
+            let built: Vec<ExpanderSwap> = {
+                let theme = cx.theme().clone();
+                let mut ctx = cx.ctx();
+                let mut built = Vec::new();
+                for (expander, checked, old_check, old_uncheck, background) in expanders {
+                    let (new_check, new_uncheck) = chevron_mark_nodes(&mut ctx, &theme);
+                    ctx.link(new_check, background);
+                    ctx.link(new_uncheck, background);
+                    built.push((
+                        expander,
+                        checked,
+                        old_check,
+                        old_uncheck,
+                        new_check,
+                        new_uncheck,
+                    ));
+                }
+                built
+            };
+
+            // Pass 3: retire old marks and wire in the right chevron per state.
+            {
+                let ui = cx.ui();
+                for (expander, checked, old_check, old_uncheck, new_check, new_uncheck) in built {
+                    ui.send(old_check, WidgetMessage::Visibility(false));
+                    ui.send(old_uncheck, WidgetMessage::Visibility(false));
+                    ui.send(new_check, WidgetMessage::Visibility(checked));
+                    ui.send(new_uncheck, WidgetMessage::Visibility(!checked));
+
+                    if let Ok(cb) = ui.try_get_mut_of_type::<CheckBox>(expander.to_base()) {
+                        cb.check_mark.set_value_and_mark_modified(new_check);
+                        cb.uncheck_mark.set_value_and_mark_modified(new_uncheck);
+                    }
+                }
+            }
+        }
 
         let component = Component {
             handle,

@@ -14,7 +14,9 @@ fn text_input_reports_text_changes() {
     let input = h.build(move |cx| {
         TextInput::new()
             .placeholder("Type here")
-            .on_change(move |_, v| { s.replace(v.to_string()); })
+            .on_change(move |_, v| {
+                s.replace(v.to_string());
+            })
             .build(cx)
     });
 
@@ -39,7 +41,9 @@ fn text_area_reports_text_changes() {
     let area = h.build(move |cx| {
         TextArea::new()
             .rows(4)
-            .on_change(move |_, v| { s.replace(v.to_string()); })
+            .on_change(move |_, v| {
+                s.replace(v.to_string());
+            })
             .build(cx)
     });
 

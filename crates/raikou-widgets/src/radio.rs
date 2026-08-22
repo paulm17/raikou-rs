@@ -7,19 +7,106 @@
 use std::rc::Rc;
 
 use fyrox::core::pool::Handle;
+use fyrox::gui::border::BorderBuilder;
+use fyrox::gui::brush::Brush;
 use fyrox::gui::check_box::{CheckBoxBuilder, CheckBoxMessage};
 use fyrox::gui::message::{MessageDirection, UiMessage};
 use fyrox::gui::stack_panel::StackPanelBuilder;
 use fyrox::gui::widget::WidgetBuilder;
-use fyrox::gui::{UiNode, UserInterface};
+use fyrox::gui::{UiNode, UserInterface, VerticalAlignment};
 
 use raikou_core::Thickness;
 
 use crate::build_cx::BuildCx;
 use crate::component::{Component, ComponentKind};
-use crate::convert::to_fyrox_thickness;
+use crate::convert::{to_fyrox_color, to_fyrox_thickness};
 
 type ChangeCallback = dyn Fn(&mut UserInterface, bool);
+
+/// Builds the Fluent-style radio marks: an ellipse ring (unchecked) and the
+/// same ring with an inner accent dot (checked). Drawn as vector borders so
+/// no font glyph dependency exists. The marks are swapped by the underlying
+/// fyrox `CheckBox according to its checked state.
+fn radio_marks(
+    ctx: &mut fyrox::gui::BuildContext,
+    theme: &raikou_style::Theme,
+) -> (Handle<UiNode>, Handle<UiNode>) {
+    let fallback_ring = raikou_core::Color::new(0.0, 0.0, 0.0, 0.45);
+    let fallback_accent = raikou_core::Color::new(0.0, 0.47, 0.83, 1.0);
+    let ring_stroke = Brush::Solid(to_fyrox_color(
+        theme.color("border.emphasis").unwrap_or(fallback_ring),
+    ));
+    let accent = Brush::Solid(to_fyrox_color(
+        theme.color("accent.solid").unwrap_or(fallback_accent),
+    ));
+    let transparent = Brush::Solid(fyrox::core::color::Color::TRANSPARENT);
+
+    let uncheck_mark = BorderBuilder::new(
+        WidgetBuilder::new()
+            .with_width(20.0)
+            .with_height(20.0)
+            .with_vertical_alignment(VerticalAlignment::Center)
+            .with_horizontal_alignment(fyrox::gui::HorizontalAlignment::Center)
+            .with_background(transparent.clone().into())
+            .with_foreground(ring_stroke.clone().into()),
+    )
+    .with_corner_radius(10.0f32.into())
+    .with_stroke_thickness(fyrox::gui::Thickness::uniform(1.0).into())
+    .with_pad_by_corner_radius(false)
+    .build(ctx)
+    .to_base();
+
+    let dot: Handle<UiNode> = BorderBuilder::new(
+        WidgetBuilder::new()
+            .with_width(8.0)
+            .with_height(8.0)
+            .with_vertical_alignment(VerticalAlignment::Center)
+            .with_horizontal_alignment(fyrox::gui::HorizontalAlignment::Center)
+            .with_background(accent.clone().into())
+            .with_foreground(transparent.clone().into()),
+    )
+    .with_corner_radius(4.0f32.into())
+    .with_stroke_thickness(fyrox::gui::Thickness::uniform(0.0).into())
+    .with_pad_by_corner_radius(false)
+    .build(ctx)
+    .to_base();
+
+    let check_mark = BorderBuilder::new(
+        WidgetBuilder::new()
+            .with_width(20.0)
+            .with_height(20.0)
+            .with_vertical_alignment(VerticalAlignment::Center)
+            .with_horizontal_alignment(fyrox::gui::HorizontalAlignment::Center)
+            .with_background(transparent.clone().into())
+            .with_foreground(ring_stroke.clone().into())
+            .with_child(dot),
+    )
+    .with_corner_radius(10.0f32.into())
+    .with_stroke_thickness(fyrox::gui::Thickness::uniform(1.0).into())
+    .with_pad_by_corner_radius(false)
+    .build(ctx)
+    .to_base();
+
+    (check_mark, uncheck_mark)
+}
+
+/// Builds the invisible 20x20 spacer that hosts the radio marks (replaces
+/// fyrox's stock box chrome).
+fn radio_background(ctx: &mut fyrox::gui::BuildContext) -> Handle<UiNode> {
+    BorderBuilder::new(
+        WidgetBuilder::new()
+            .with_width(20.0)
+            .with_height(20.0)
+            .with_vertical_alignment(VerticalAlignment::Center)
+            .with_background(Brush::Solid(fyrox::core::color::Color::TRANSPARENT).into())
+            .with_foreground(Brush::Solid(fyrox::core::color::Color::TRANSPARENT).into()),
+    )
+    .with_stroke_thickness(fyrox::gui::Thickness::uniform(0.0).into())
+    .with_corner_radius(10.0f32.into())
+    .with_pad_by_corner_radius(false)
+    .build(ctx)
+    .to_base()
+}
 
 /// Event handlers of a single Radio option.
 #[derive(Clone)]
@@ -112,9 +199,15 @@ impl Radio {
             .with_margin(to_fyrox_thickness(self.margin));
 
         let handle = {
+            let theme = cx.theme().clone();
             let mut ctx = cx.ctx();
+            let (check_mark, uncheck_mark) = radio_marks(&mut ctx, &theme);
+            let background = radio_background(&mut ctx);
             CheckBoxBuilder::new(widget_builder)
                 .checked(Some(self.selected))
+                .with_background(background)
+                .with_check_mark(check_mark)
+                .with_uncheck_mark(uncheck_mark)
                 .with_content(label_handle)
                 .build(&mut ctx)
                 .to_base()
@@ -263,15 +356,24 @@ impl RadioGroup {
             let is_checked = i == selected;
             let mut widget_builder = WidgetBuilder::new().with_name("raikou_radio_option");
             if i != self.options.len() - 1 {
-                widget_builder = widget_builder.with_margin(to_fyrox_thickness(
-                    Thickness::new(0.0, 0.0, 0.0, self.spacing),
-                ));
+                widget_builder = widget_builder.with_margin(to_fyrox_thickness(Thickness::new(
+                    0.0,
+                    0.0,
+                    0.0,
+                    self.spacing,
+                )));
             }
 
             let handle = {
+                let theme = cx.theme().clone();
                 let mut ctx = cx.ctx();
+                let (check_mark, uncheck_mark) = radio_marks(&mut ctx, &theme);
+                let background = radio_background(&mut ctx);
                 CheckBoxBuilder::new(widget_builder)
                     .checked(Some(is_checked))
+                    .with_background(background)
+                    .with_check_mark(check_mark)
+                    .with_uncheck_mark(uncheck_mark)
                     .with_content(label_handle)
                     .build(&mut ctx)
                     .to_base()

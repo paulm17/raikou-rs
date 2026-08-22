@@ -15,8 +15,12 @@ fn build_demo_panel(
 ) -> Handle<UiNode> {
     let mut cx = BuildCx::new(ui, theme, registry);
 
-    let primary = theme.color("text.primary").unwrap_or(Color::new(0.0, 0.0, 0.0, 1.0));
-    let muted = theme.color("text.muted").unwrap_or(Color::new(0.5, 0.5, 0.5, 1.0));
+    let primary = theme
+        .color("text.primary")
+        .unwrap_or(Color::new(0.0, 0.0, 0.0, 1.0));
+    let muted = theme
+        .color("text.muted")
+        .unwrap_or(Color::new(0.5, 0.5, 0.5, 1.0));
 
     // A few labels at different hierarchy levels.
     let heading = Label::new("Phase 1 — static & layout primitives")
@@ -87,13 +91,25 @@ fn build_demo_panel(
     // A Popover anchored to a Button. Clicking the button opens it.
     let popover_content = BoxWidget::new()
         .width(Length::Fixed(160.0))
-        .color(theme.color("surface.elevated").unwrap_or(Color::new(1.0, 1.0, 1.0, 1.0)))
-        .border_color(theme.color("border.default").unwrap_or(Color::new(0.7, 0.7, 0.7, 1.0)))
+        .color(
+            theme
+                .color("surface.elevated")
+                .unwrap_or(Color::new(1.0, 1.0, 1.0, 1.0)),
+        )
+        .border_color(
+            theme
+                .color("border.default")
+                .unwrap_or(Color::new(0.7, 0.7, 0.7, 1.0)),
+        )
         .border_width(1.0)
         .corner_radius(6.0)
         .build(&mut cx);
     let inner_label = Label::new("Popover content")
-        .color(theme.color("text.primary").unwrap_or(Color::new(0.0, 0.0, 0.0, 1.0)))
+        .color(
+            theme
+                .color("text.primary")
+                .unwrap_or(Color::new(0.0, 0.0, 0.0, 1.0)),
+        )
         .build(&mut cx);
     let popover_content_handle: Handle<UiNode> = popover_content.into();
     {

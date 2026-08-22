@@ -19,7 +19,11 @@ fn build_demo_panel(
     let mut cx = BuildCx::new(ui, theme, registry);
 
     let status: Handle<UiNode> = Label::new("no interaction yet")
-        .color(theme.color("text.muted").unwrap_or(raikou::Color::new(0.4, 0.4, 0.4, 1.0)))
+        .color(
+            theme
+                .color("text.muted")
+                .unwrap_or(raikou::Color::new(0.4, 0.4, 0.4, 1.0)),
+        )
         .build(&mut cx)
         .into();
 
@@ -82,7 +86,11 @@ fn build_demo_panel(
 
     let heading = Label::new("Input controls")
         .font_size(18.0)
-        .color(theme.color("text.primary").unwrap_or(raikou::Color::new(1.0, 1.0, 1.0, 1.0)))
+        .color(
+            theme
+                .color("text.primary")
+                .unwrap_or(raikou::Color::new(1.0, 1.0, 1.0, 1.0)),
+        )
         .build(&mut cx);
 
     Stack::new()

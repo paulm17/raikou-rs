@@ -123,12 +123,7 @@ impl Control for PlaygroundShellControl {
         let top_h = self.top_height(final_size.y);
         let preview_w = self.preview_width(usable_w);
 
-        let preview_card = Rect::new(
-            self.outer_padding,
-            self.outer_padding,
-            preview_w,
-            top_h,
-        );
+        let preview_card = Rect::new(self.outer_padding, self.outer_padding, preview_w, top_h);
         let controls_card = Rect::new(
             preview_card.position.x + preview_card.size.x + self.gap,
             self.outer_padding,
@@ -174,12 +169,7 @@ impl Control for PlaygroundShellControl {
         let top_h = self.top_height(bounds.size.y);
         let preview_w = self.preview_width(usable_w);
 
-        let preview_card = Rect::new(
-            self.outer_padding,
-            self.outer_padding,
-            preview_w,
-            top_h,
-        );
+        let preview_card = Rect::new(self.outer_padding, self.outer_padding, preview_w, top_h);
         let controls_card = Rect::new(
             preview_card.position.x + preview_card.size.x + self.gap,
             self.outer_padding,
@@ -298,7 +288,7 @@ impl PlaygroundShell {
                 widget: WidgetBuilder::new()
                     .with_name("raikou_playground_shell")
                     .with_children(vec![self.preview, controls, self.code])
-                    .build(&mut ctx),
+                    .build(&ctx),
                 preview: self.preview,
                 controls,
                 code: self.code,
@@ -352,7 +342,11 @@ impl Control for PlaygroundPreviewControl {
         let available_size = bounded(available_size);
         let inner_width = (available_size.x - self.padding * 2.0).max(0.0);
         let inner_height = (available_size.y - self.padding * 2.0).max(0.0);
-        let child_width = self.max_width.unwrap_or(inner_width).min(inner_width).max(1.0);
+        let child_width = self
+            .max_width
+            .unwrap_or(inner_width)
+            .min(inner_width)
+            .max(1.0);
         let child_height = self
             .max_height
             .unwrap_or(inner_height)
@@ -501,7 +495,7 @@ impl PlaygroundPreview {
                 widget: WidgetBuilder::new()
                     .with_name("raikou_playground_preview")
                     .with_child(self.child)
-                    .build(&mut ctx),
+                    .build(&ctx),
                 child: self.child,
                 padding: self.padding,
                 max_width: self.max_width,
@@ -567,12 +561,7 @@ impl Control for PlaygroundCodePanelControl {
         ui.arrange_node(self.title_text, &Rect::new(28.0, 15.0, 104.0, 22.0));
         ui.arrange_node(
             self.scroll,
-            &Rect::new(
-                20.0,
-                59.0,
-                (final_size.x - 40.0).max(1.0),
-                body_height,
-            ),
+            &Rect::new(20.0, 59.0, (final_size.x - 40.0).max(1.0), body_height),
         );
         final_size
     }
@@ -692,7 +681,7 @@ impl PlaygroundCodePanel {
                 widget: WidgetBuilder::new()
                     .with_name("raikou_playground_code")
                     .with_children(vec![title_text, scroll])
-                    .build(&mut ctx),
+                    .build(&ctx),
                 title_text,
                 scroll,
                 height: self.height,
@@ -742,7 +731,7 @@ impl PlaygroundCodeBlock {
                 .with_name("raikou_code")
                 .with_foreground(Brush::Solid(to_fyrox_color(fg)).into()),
         )
-        .with_text(&(self.code)())
+        .with_text((self.code)())
         .build(&mut ctx)
         .to_base()
     }

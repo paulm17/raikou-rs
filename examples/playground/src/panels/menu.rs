@@ -50,7 +50,10 @@ pub fn menu_panel(
                 MenuItem::new("Format document"),
             ],
         )
-        .menu("View", vec![MenuItem::new("Command palette"), MenuItem::new("Problems")])
+        .menu(
+            "View",
+            vec![MenuItem::new("Command palette"), MenuItem::new("Problems")],
+        )
         .build(&mut cx);
 
     let standalone = ContextMenu::new()

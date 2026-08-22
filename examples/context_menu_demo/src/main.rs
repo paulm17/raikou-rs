@@ -16,12 +16,10 @@ fn build_demo_panel(
 ) -> Handle<UiNode> {
     let mut cx = BuildCx::new(ui, theme, registry);
 
-    let status: Handle<UiNode> = TextBuilder::new(
-        WidgetBuilder::new().with_name("raikou_status"),
-    )
-    .with_text("no interaction yet")
-    .build(&mut cx.ctx())
-    .to_base();
+    let status: Handle<UiNode> = TextBuilder::new(WidgetBuilder::new().with_name("raikou_status"))
+        .with_text("no interaction yet")
+        .build(&mut cx.ctx())
+        .to_base();
 
     let context_menu = ContextMenu::new()
         .item(MenuItem::new("Cut").on_click(move |ui, index| {
@@ -35,7 +33,10 @@ fn build_demo_panel(
         }))
         .item(MenuItem::new("Delete").disabled())
         .on_item_click(move |ui, index| {
-            ui.send(status, TextMessage::Text(format!("item clicked -> index {index}")));
+            ui.send(
+                status,
+                TextMessage::Text(format!("item clicked -> index {index}")),
+            );
         })
         .build(&mut cx);
     let context_menu_handle: Handle<UiNode> = context_menu.into();
@@ -57,7 +58,11 @@ fn build_demo_panel(
     let heading_handle: Handle<UiNode> = heading.into();
 
     let hint = Label::new("Click the button to open the menu next to the pointer.")
-        .color(theme.color("text.muted").unwrap_or(Color::new(0.4, 0.4, 0.4, 1.0)))
+        .color(
+            theme
+                .color("text.muted")
+                .unwrap_or(Color::new(0.4, 0.4, 0.4, 1.0)),
+        )
         .build(&mut cx);
     let hint_handle: Handle<UiNode> = hint.into();
 

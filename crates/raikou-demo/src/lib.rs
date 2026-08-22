@@ -63,12 +63,8 @@ impl Default for Options {
 /// Builds the component tree for a demo. Receives the live `UserInterface`,
 /// the resolved `Theme`, and the `ComponentRegistry` (already wired to
 /// dispatch on every polled message).
-pub type PanelBuilder<'a> = dyn FnOnce(
-        &mut UserInterface,
-        &Theme,
-        &mut ComponentRegistry,
-    ) -> Handle<UiNode>
-    + 'a;
+pub type PanelBuilder<'a> =
+    dyn FnOnce(&mut UserInterface, &Theme, &mut ComponentRegistry) -> Handle<UiNode> + 'a;
 
 /// Runs a demo window: boots the fyrox engine with a single `UserInterface`,
 /// builds the panel via `build`, and drives the tool loop until the window
@@ -278,14 +274,10 @@ pub fn run(options: Options, build: Box<PanelBuilder>) {
                                         &mut engine.graphics_context
                                     {
                                         let size = ctx.window.inner_size();
-                                        let clear = match std::env::var("RAIKOU_CLEAR")
-                                            .as_deref()
-                                        {
+                                        let clear = match std::env::var("RAIKOU_CLEAR").as_deref() {
                                             Ok("black") => Color::BLACK,
                                             Ok("dark") => Color::from_rgba(0x20, 0x20, 0x20, 255),
-                                            _ => match std::env::var("RAIKOU_THEME")
-                                                .as_deref()
-                                            {
+                                            _ => match std::env::var("RAIKOU_THEME").as_deref() {
                                                 Ok("dark") => {
                                                     Color::from_rgba(0x20, 0x20, 0x20, 255)
                                                 }
@@ -326,6 +318,10 @@ pub fn run(options: Options, build: Box<PanelBuilder>) {
 /// Default dispatcher: routes each polled message into the raikou registry so
 /// component handlers fire. Demos that need extra message handling wrap this
 /// with their own logic before calling it.
-pub fn dispatch_message(ui: &mut UserInterface, registry: &mut ComponentRegistry, message: &UiMessage) {
+pub fn dispatch_message(
+    ui: &mut UserInterface,
+    registry: &mut ComponentRegistry,
+    message: &UiMessage,
+) {
     registry.dispatch(ui, message);
 }

@@ -8,7 +8,7 @@ use std::rc::Rc;
 use fyrox::core::pool::Handle;
 use fyrox::gui::message::{MessageDirection, UiMessage};
 use fyrox::gui::text::TextMessage;
-use fyrox::gui::text_box::{TextCommitMode, TextBoxBuilder};
+use fyrox::gui::text_box::{TextBoxBuilder, TextCommitMode};
 use fyrox::gui::widget::WidgetBuilder;
 use fyrox::gui::{UiNode, UserInterface};
 

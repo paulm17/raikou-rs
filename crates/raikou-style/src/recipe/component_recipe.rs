@@ -63,7 +63,7 @@ impl ComponentRecipe {
 
         for compound in &self.compound_variants {
             if compound.matches(effective_variants, widget_state) {
-                result.merge(&compound.style());
+                result.merge(compound.style());
             }
         }
 

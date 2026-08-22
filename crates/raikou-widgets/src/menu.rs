@@ -4,6 +4,7 @@
 use std::rc::Rc;
 
 use fyrox::core::pool::Handle;
+use fyrox::graph::SceneGraph;
 use fyrox::gui::border::Border;
 use fyrox::gui::brush::Brush;
 use fyrox::gui::decorator::{Decorator, DecoratorMessage};
@@ -11,7 +12,8 @@ use fyrox::gui::dropdown_menu::DropdownMenu;
 use fyrox::gui::menu::{MenuItemBuilder, MenuItemContent, MenuItemMessage};
 use fyrox::gui::message::UiMessage;
 use fyrox::gui::popup::Popup;
-use fyrox::gui::widget::WidgetBuilder;
+use fyrox::gui::text::Text;
+use fyrox::gui::widget::{WidgetBuilder, WidgetMessage};
 use fyrox::gui::{UiNode, UserInterface};
 
 use raikou_core::Thickness;
@@ -24,18 +26,23 @@ type ItemClickCallback = dyn Fn(&mut UserInterface, usize);
 
 /// Applies Fluent flyout styling to every popup body and menu-item
 /// decorator reachable from `roots` (including nested sub-menu popups,
-/// which live outside the normal widget tree).
+/// which live outside the normal widget tree). Items listed in `disabled`
+/// are additionally disabled and dimmed (Fluent disabled label, no hover
+/// chrome).
 pub(crate) fn style_menu_chrome(
     ui: &mut UserInterface,
     theme: &raikou_style::Theme,
     roots: &[Handle<UiNode>],
+    disabled: &[Handle<UiNode>],
 ) {
-    use fyrox::graph::SceneGraph;
-
     let fallback_white = raikou_core::Color::new(1.0, 1.0, 1.0, 1.0);
-    let elevated = Brush::Solid(to_fyrox_color(theme.color("surface.elevated").unwrap_or(fallback_white)));
+    let elevated = Brush::Solid(to_fyrox_color(
+        theme.color("surface.elevated").unwrap_or(fallback_white),
+    ));
     let stroke = Brush::Solid(to_fyrox_color(
-        theme.color("border.subtle").unwrap_or(raikou_core::Color::new(0.0, 0.0, 0.0, 0.14)),
+        theme
+            .color("border.subtle")
+            .unwrap_or(raikou_core::Color::new(0.0, 0.0, 0.0, 0.14)),
     ));
     let hover = Brush::Solid(to_fyrox_color(
         theme
@@ -47,6 +54,7 @@ pub(crate) fn style_menu_chrome(
             .color("fluent.list.medium")
             .unwrap_or(raikou_core::Color::new(0.0, 0.0, 0.0, 0.10)),
     ));
+    let transparent = Brush::Solid(fyrox::core::color::Color::TRANSPARENT);
 
     let mut stack: Vec<Handle<UiNode>> = roots.to_vec();
     let mut visited: Vec<Handle<UiNode>> = roots.to_vec();
@@ -67,10 +75,18 @@ pub(crate) fn style_menu_chrome(
         if let Ok(popup) = ui.try_get_of_type::<Popup>(h) {
             let body: Handle<UiNode> = *popup.body;
             if !body.is_none() {
-                ui.send(body, fyrox::gui::widget::WidgetMessage::Background(elevated.clone().into()));
-                ui.send(body, fyrox::gui::widget::WidgetMessage::Foreground(stroke.clone().into()));
+                ui.send(
+                    body,
+                    fyrox::gui::widget::WidgetMessage::Background(elevated.clone().into()),
+                );
+                ui.send(
+                    body,
+                    fyrox::gui::widget::WidgetMessage::Foreground(stroke.clone().into()),
+                );
                 if let Ok(border) = ui.try_get_mut_of_type::<Border>(body) {
-                    border.corner_radius.set_value_and_mark_modified(4.0f32.into());
+                    border
+                        .corner_radius
+                        .set_value_and_mark_modified(4.0f32.into());
                 }
             }
         }
@@ -89,16 +105,26 @@ pub(crate) fn style_menu_chrome(
                 visited.push(items_panel);
                 stack.push(items_panel);
             }
-            let node = ui.node(h);
-            if node.children.len() == 1 {
-                let decorator = node.children[0];
-                if ui.try_get_of_type::<Decorator>(decorator).is_ok() {
-                    ui.send(decorator, DecoratorMessage::NormalBrush(Brush::Solid(fyrox::core::color::Color::TRANSPARENT).into()));
-                    ui.send(decorator, DecoratorMessage::HoverBrush(hover.clone().into()));
-                    ui.send(decorator, DecoratorMessage::PressedBrush(pressed.clone().into()));
-                    ui.send(decorator, DecoratorMessage::SelectedBrush(hover.clone().into()));
-                }
-            }
+        }
+        if let Some(decorator) = item_decorator(ui, h) {
+            ui.send(
+                decorator,
+                DecoratorMessage::NormalBrush(
+                    Brush::Solid(fyrox::core::color::Color::TRANSPARENT).into(),
+                ),
+            );
+            ui.send(
+                decorator,
+                DecoratorMessage::HoverBrush(hover.clone().into()),
+            );
+            ui.send(
+                decorator,
+                DecoratorMessage::PressedBrush(pressed.clone().into()),
+            );
+            ui.send(
+                decorator,
+                DecoratorMessage::SelectedBrush(hover.clone().into()),
+            );
         }
 
         for child in ui.node(h).children().to_vec() {
@@ -108,8 +134,58 @@ pub(crate) fn style_menu_chrome(
             }
         }
     }
+
+    // Disabled items: block interaction and dim per Fluent (muted label,
+    // no hover/pressed chrome). Applied after the walk so it wins.
+    let fallback_disabled = raikou_core::Color::new(0.478, 0.478, 0.478, 1.0);
+    let dim = Brush::Solid(to_fyrox_color(
+        theme
+            .color("fluent.chrome.disabled.low")
+            .unwrap_or(fallback_disabled),
+    ));
+    for &item in disabled {
+        if item.is_none() {
+            continue;
+        }
+        ui.send(item, WidgetMessage::Enabled(false));
+        let Some(decorator) = item_decorator(ui, item) else {
+            continue;
+        };
+        ui.send(
+            decorator,
+            DecoratorMessage::HoverBrush(transparent.clone().into()),
+        );
+        ui.send(
+            decorator,
+            DecoratorMessage::PressedBrush(transparent.clone().into()),
+        );
+        ui.send(
+            decorator,
+            DecoratorMessage::SelectedBrush(transparent.clone().into()),
+        );
+        // Dim every text under the item's decorator.
+        let mut stack = vec![decorator];
+        while let Some(cur) = stack.pop() {
+            for child in ui.node(cur).children().to_vec() {
+                stack.push(child);
+            }
+            if ui.try_get_of_type::<Text>(cur).is_ok() {
+                ui.send(cur, WidgetMessage::Foreground(dim.clone().into()));
+            }
+        }
+    }
 }
 
+/// Returns the handle of `item`'s content Decorator, if it has exactly one
+/// (the stock fyrox MenuItem shape).
+fn item_decorator(ui: &UserInterface, item: Handle<UiNode>) -> Option<Handle<UiNode>> {
+    let node = ui.node(item);
+    if node.children.len() == 1 && ui.try_get_of_type::<Decorator>(node.children[0]).is_ok() {
+        Some(node.children[0])
+    } else {
+        None
+    }
+}
 
 /// A single menu item. Leaf items fire `on_click` (indexed); items with
 /// `children` render as a sub-menu.
@@ -163,9 +239,18 @@ impl MenuBarHandlers {
     pub fn dispatch(&self, ui: &mut UserInterface, message: &UiMessage) {
         if let Some(on_item_click) = &self.on_item_click {
             if message.data::<MenuItemMessage>() == Some(&MenuItemMessage::Click) {
-                if let Some(index) = self.item_handles.iter().position(|h| *h == message.destination())
+                if let Some(index) = self
+                    .item_handles
+                    .iter()
+                    .position(|h| *h == message.destination())
                 {
-                    on_item_click(ui, index);
+                    let enabled = ui
+                        .try_get(message.destination())
+                        .map(|node| node.enabled())
+                        .unwrap_or(false);
+                    if enabled {
+                        on_item_click(ui, index);
+                    }
                 }
             }
         }
@@ -218,6 +303,7 @@ impl MenuBar {
     pub fn build(self, cx: &mut BuildCx) -> Component {
         let mut ctx = cx.ctx();
         let mut item_handles: Vec<Handle<UiNode>> = Vec::new();
+        let mut disabled_handles: Vec<Handle<UiNode>> = Vec::new();
 
         let mut dropdown_handles = Vec::new();
         for (label, items) in &self.menus {
@@ -231,7 +317,7 @@ impl MenuBar {
             .build(&mut ctx)
             .to_base();
 
-            let item_nodes = build_items(items, &mut item_handles, &mut ctx);
+            let item_nodes = build_items(items, &mut item_handles, &mut disabled_handles, &mut ctx);
             let item_nodes: Vec<Handle<UiNode>> =
                 item_nodes.into_iter().map(|h| h.to_base()).collect();
 
@@ -274,7 +360,7 @@ impl MenuBar {
             let mut roots = vec![handle];
             roots.extend(dropdown_handles.iter().copied());
             let theme = cx.theme().clone();
-            style_menu_chrome(cx.ui(), &theme, &roots);
+            style_menu_chrome(cx.ui(), &theme, &roots, &disabled_handles);
         }
         let _ = dropdown_handles;
 
@@ -284,7 +370,10 @@ impl MenuBar {
         });
         // Clicks target individual item handles, so the handlers must be
         // reachable from every item destination, not just the bar root.
-        cx.register(&Component { handle, kind: kind.clone() });
+        cx.register(&Component {
+            handle,
+            kind: kind.clone(),
+        });
         for item in &item_handles {
             cx.register(&Component {
                 handle: *item,
@@ -296,27 +385,30 @@ impl MenuBar {
 }
 
 /// Recursively builds a set of menu items into fyrox `MenuItem` widgets,
-/// recording leaf handles and their flat index.
+/// recording leaf handles and their flat index, plus the handles of any
+/// disabled items.
 pub(crate) fn build_items(
     items: &[MenuItem],
     item_handles: &mut Vec<Handle<UiNode>>,
+    disabled_handles: &mut Vec<Handle<UiNode>>,
     ctx: &mut fyrox::gui::BuildContext,
 ) -> Vec<Handle<fyrox::gui::menu::MenuItem>> {
     let mut handles = Vec::new();
     for item in items {
-        let mut builder = MenuItemBuilder::new(
-            WidgetBuilder::new().with_name("raikou_menu_item"),
-        )
-        .with_content(MenuItemContent::text(&item.label));
+        let mut builder = MenuItemBuilder::new(WidgetBuilder::new().with_name("raikou_menu_item"))
+            .with_content(MenuItemContent::text(&item.label));
 
         if !item.children.is_empty() {
-            let sub = build_items(&item.children, item_handles, ctx);
+            let sub = build_items(&item.children, item_handles, disabled_handles, ctx);
             builder = builder.with_items(sub);
         }
 
         let handle = builder.build(ctx);
         let base: Handle<UiNode> = handle.to_base();
         item_handles.push(base);
+        if !item.enabled {
+            disabled_handles.push(base);
+        }
         handles.push(handle);
     }
     handles

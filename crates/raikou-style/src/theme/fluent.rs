@@ -29,11 +29,15 @@ const ACCENT_DARK1: u32 = 0x005A9E;
 const ACCENT_DARK2: u32 = 0x004275;
 const ACCENT_DARK3: u32 = 0x002642;
 
-fn shared_typography(
-    t: &mut crate::theme::tokens::TypographyScale,
-) {
-    t.font_family("sans-serif", "'Segoe UI Variable Text', 'Segoe UI', Inter, system-ui, sans-serif");
-    t.font_family("mono", "ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace");
+fn shared_typography(t: &mut crate::theme::tokens::TypographyScale) {
+    t.font_family(
+        "sans-serif",
+        "'Segoe UI Variable Text', 'Segoe UI', Inter, system-ui, sans-serif",
+    );
+    t.font_family(
+        "mono",
+        "ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace",
+    );
     t.font_size("xs", 12.0);
     t.font_size("sm", 14.0);
     t.font_size("md", 16.0);
@@ -95,23 +99,59 @@ fn shared_radii(r: &mut crate::theme::tokens::RadiusScale) {
 fn shared_shadows_light(s: &mut crate::theme::tokens::ShadowScale) {
     use crate::property::Shadow;
     s.insert("none", Shadow::default());
-    s.insert("sm", Shadow::new(0.0, 1.0, 2.0, 0.0, Color::new(0.0, 0.0, 0.0, 0.098)));
-    s.insert("md", Shadow::new(0.0, 4.0, 8.0, -1.0, Color::new(0.0, 0.0, 0.0, 0.14)));
-    s.insert("lg", Shadow::new(0.0, 8.0, 16.0, -2.0, Color::new(0.0, 0.0, 0.0, 0.19)));
-    s.insert("xl", Shadow::new(0.0, 16.0, 32.0, -4.0, Color::new(0.0, 0.0, 0.0, 0.24)));
-    s.insert("focus", Shadow::new(0.0, 0.0, 0.0, 2.0, hex(ACCENT_LIGHT1, 0.55)));
-    s.insert("inner", Shadow::new(0.0, 2.0, 4.0, 0.0, Color::new(0.0, 0.0, 0.0, 0.098)));
+    s.insert(
+        "sm",
+        Shadow::new(0.0, 1.0, 2.0, 0.0, Color::new(0.0, 0.0, 0.0, 0.098)),
+    );
+    s.insert(
+        "md",
+        Shadow::new(0.0, 4.0, 8.0, -1.0, Color::new(0.0, 0.0, 0.0, 0.14)),
+    );
+    s.insert(
+        "lg",
+        Shadow::new(0.0, 8.0, 16.0, -2.0, Color::new(0.0, 0.0, 0.0, 0.19)),
+    );
+    s.insert(
+        "xl",
+        Shadow::new(0.0, 16.0, 32.0, -4.0, Color::new(0.0, 0.0, 0.0, 0.24)),
+    );
+    s.insert(
+        "focus",
+        Shadow::new(0.0, 0.0, 0.0, 2.0, hex(ACCENT_LIGHT1, 0.55)),
+    );
+    s.insert(
+        "inner",
+        Shadow::new(0.0, 2.0, 4.0, 0.0, Color::new(0.0, 0.0, 0.0, 0.098)),
+    );
 }
 
 fn shared_shadows_dark(s: &mut crate::theme::tokens::ShadowScale) {
     use crate::property::Shadow;
     s.insert("none", Shadow::default());
-    s.insert("sm", Shadow::new(0.0, 1.0, 2.0, 0.0, Color::new(0.0, 0.0, 0.0, 0.35)));
-    s.insert("md", Shadow::new(0.0, 4.0, 8.0, -1.0, Color::new(0.0, 0.0, 0.0, 0.45)));
-    s.insert("lg", Shadow::new(0.0, 8.0, 16.0, -2.0, Color::new(0.0, 0.0, 0.0, 0.55)));
-    s.insert("xl", Shadow::new(0.0, 16.0, 32.0, -4.0, Color::new(0.0, 0.0, 0.0, 0.65)));
-    s.insert("focus", Shadow::new(0.0, 0.0, 0.0, 2.0, hex(ACCENT_LIGHT1, 0.60)));
-    s.insert("inner", Shadow::new(0.0, 2.0, 4.0, 0.0, Color::new(0.0, 0.0, 0.0, 0.35)));
+    s.insert(
+        "sm",
+        Shadow::new(0.0, 1.0, 2.0, 0.0, Color::new(0.0, 0.0, 0.0, 0.35)),
+    );
+    s.insert(
+        "md",
+        Shadow::new(0.0, 4.0, 8.0, -1.0, Color::new(0.0, 0.0, 0.0, 0.45)),
+    );
+    s.insert(
+        "lg",
+        Shadow::new(0.0, 8.0, 16.0, -2.0, Color::new(0.0, 0.0, 0.0, 0.55)),
+    );
+    s.insert(
+        "xl",
+        Shadow::new(0.0, 16.0, 32.0, -4.0, Color::new(0.0, 0.0, 0.0, 0.65)),
+    );
+    s.insert(
+        "focus",
+        Shadow::new(0.0, 0.0, 0.0, 2.0, hex(ACCENT_LIGHT1, 0.60)),
+    );
+    s.insert(
+        "inner",
+        Shadow::new(0.0, 2.0, 4.0, 0.0, Color::new(0.0, 0.0, 0.0, 0.35)),
+    );
 }
 
 /// Fluent "standard" button recipe (non-accent): translucent gray fill,
@@ -138,59 +178,204 @@ fn button_recipe(b: &mut super::ComponentRecipeBuilder, dark: bool) {
     };
 
     b.base(|s| {
-        s.set_color(box_style::BACKGROUND, accent_bg, StylePrecedence::BaseRecipe, crate::style::StyleSource::Recipe);
-        s.set_color(text_style::COLOR, Color::new(1.0, 1.0, 1.0, 1.0), StylePrecedence::BaseRecipe, crate::style::StyleSource::Recipe);
-        s.set_f32(box_style::BORDER_RADIUS, 3.0, StylePrecedence::BaseRecipe, crate::style::StyleSource::Recipe);
-        s.set_f32(layout::PADDING, 6.0, StylePrecedence::BaseRecipe, crate::style::StyleSource::Recipe);
-        s.set_f32(text_style::FONT_SIZE, 14.0, StylePrecedence::BaseRecipe, crate::style::StyleSource::Recipe);
-        s.set_f32(text_style::FONT_WEIGHT, 400.0, StylePrecedence::BaseRecipe, crate::style::StyleSource::Recipe);
+        s.set_color(
+            box_style::BACKGROUND,
+            accent_bg,
+            StylePrecedence::BaseRecipe,
+            crate::style::StyleSource::Recipe,
+        );
+        s.set_color(
+            text_style::COLOR,
+            Color::new(1.0, 1.0, 1.0, 1.0),
+            StylePrecedence::BaseRecipe,
+            crate::style::StyleSource::Recipe,
+        );
+        s.set_f32(
+            box_style::BORDER_RADIUS,
+            3.0,
+            StylePrecedence::BaseRecipe,
+            crate::style::StyleSource::Recipe,
+        );
+        s.set_f32(
+            layout::PADDING,
+            6.0,
+            StylePrecedence::BaseRecipe,
+            crate::style::StyleSource::Recipe,
+        );
+        s.set_f32(
+            text_style::FONT_SIZE,
+            14.0,
+            StylePrecedence::BaseRecipe,
+            crate::style::StyleSource::Recipe,
+        );
+        s.set_f32(
+            text_style::FONT_WEIGHT,
+            400.0,
+            StylePrecedence::BaseRecipe,
+            crate::style::StyleSource::Recipe,
+        );
     });
     b.variant("appearance", "filled", |s| {
-        s.set_color(box_style::BACKGROUND, accent_bg, StylePrecedence::Variant, crate::style::StyleSource::Variant);
-        s.set_color(text_style::COLOR, Color::new(1.0, 1.0, 1.0, 1.0), StylePrecedence::Variant, crate::style::StyleSource::Variant);
+        s.set_color(
+            box_style::BACKGROUND,
+            accent_bg,
+            StylePrecedence::Variant,
+            crate::style::StyleSource::Variant,
+        );
+        s.set_color(
+            text_style::COLOR,
+            Color::new(1.0, 1.0, 1.0, 1.0),
+            StylePrecedence::Variant,
+            crate::style::StyleSource::Variant,
+        );
     });
     b.variant("appearance", "outline", |s| {
-        s.set_color(box_style::BACKGROUND, bg_normal, StylePrecedence::Variant, crate::style::StyleSource::Variant);
-        s.set_color(text_style::COLOR, fg, StylePrecedence::Variant, crate::style::StyleSource::Variant);
+        s.set_color(
+            box_style::BACKGROUND,
+            bg_normal,
+            StylePrecedence::Variant,
+            crate::style::StyleSource::Variant,
+        );
+        s.set_color(
+            text_style::COLOR,
+            fg,
+            StylePrecedence::Variant,
+            crate::style::StyleSource::Variant,
+        );
     });
     b.variant("appearance", "ghost", |s| {
-        s.set_color(box_style::BACKGROUND, Color::TRANSPARENT, StylePrecedence::Variant, crate::style::StyleSource::Variant);
-        s.set_color(text_style::COLOR, fg, StylePrecedence::Variant, crate::style::StyleSource::Variant);
+        s.set_color(
+            box_style::BACKGROUND,
+            Color::TRANSPARENT,
+            StylePrecedence::Variant,
+            crate::style::StyleSource::Variant,
+        );
+        s.set_color(
+            text_style::COLOR,
+            fg,
+            StylePrecedence::Variant,
+            crate::style::StyleSource::Variant,
+        );
     });
     b.variant("appearance", "subtle", |s| {
-        s.set_color(box_style::BACKGROUND, bg_normal, StylePrecedence::Variant, crate::style::StyleSource::Variant);
-        s.set_color(text_style::COLOR, fg, StylePrecedence::Variant, crate::style::StyleSource::Variant);
+        s.set_color(
+            box_style::BACKGROUND,
+            bg_normal,
+            StylePrecedence::Variant,
+            crate::style::StyleSource::Variant,
+        );
+        s.set_color(
+            text_style::COLOR,
+            fg,
+            StylePrecedence::Variant,
+            crate::style::StyleSource::Variant,
+        );
     });
     b.variant("appearance", "link", |s| {
-        s.set_color(box_style::BACKGROUND, Color::TRANSPARENT, StylePrecedence::Variant, crate::style::StyleSource::Variant);
-        s.set_color(text_style::COLOR, hex(ACCENT, 1.0), StylePrecedence::Variant, crate::style::StyleSource::Variant);
+        s.set_color(
+            box_style::BACKGROUND,
+            Color::TRANSPARENT,
+            StylePrecedence::Variant,
+            crate::style::StyleSource::Variant,
+        );
+        s.set_color(
+            text_style::COLOR,
+            hex(ACCENT, 1.0),
+            StylePrecedence::Variant,
+            crate::style::StyleSource::Variant,
+        );
     });
     b.variant("size", "small", |s| {
-        s.set_f32(layout::PADDING, 4.0, StylePrecedence::Variant, crate::style::StyleSource::Variant);
-        s.set_f32(text_style::FONT_SIZE, 12.0, StylePrecedence::Variant, crate::style::StyleSource::Variant);
+        s.set_f32(
+            layout::PADDING,
+            4.0,
+            StylePrecedence::Variant,
+            crate::style::StyleSource::Variant,
+        );
+        s.set_f32(
+            text_style::FONT_SIZE,
+            12.0,
+            StylePrecedence::Variant,
+            crate::style::StyleSource::Variant,
+        );
     });
     b.variant("size", "medium", |s| {
-        s.set_f32(layout::PADDING, 6.0, StylePrecedence::Variant, crate::style::StyleSource::Variant);
-        s.set_f32(text_style::FONT_SIZE, 14.0, StylePrecedence::Variant, crate::style::StyleSource::Variant);
+        s.set_f32(
+            layout::PADDING,
+            6.0,
+            StylePrecedence::Variant,
+            crate::style::StyleSource::Variant,
+        );
+        s.set_f32(
+            text_style::FONT_SIZE,
+            14.0,
+            StylePrecedence::Variant,
+            crate::style::StyleSource::Variant,
+        );
     });
     b.variant("size", "large", |s| {
-        s.set_f32(layout::PADDING, 8.0, StylePrecedence::Variant, crate::style::StyleSource::Variant);
-        s.set_f32(text_style::FONT_SIZE, 16.0, StylePrecedence::Variant, crate::style::StyleSource::Variant);
+        s.set_f32(
+            layout::PADDING,
+            8.0,
+            StylePrecedence::Variant,
+            crate::style::StyleSource::Variant,
+        );
+        s.set_f32(
+            text_style::FONT_SIZE,
+            16.0,
+            StylePrecedence::Variant,
+            crate::style::StyleSource::Variant,
+        );
     });
     b.state(WidgetState::new().hovered(), |s| {
-        s.set_color(box_style::BACKGROUND, accent_bg_hover, StylePrecedence::StateStyle, crate::style::StyleSource::State);
+        s.set_color(
+            box_style::BACKGROUND,
+            accent_bg_hover,
+            StylePrecedence::StateStyle,
+            crate::style::StyleSource::State,
+        );
     });
     b.state(WidgetState::new().pressed(), |s| {
-        s.set_color(box_style::BACKGROUND, accent_bg_pressed, StylePrecedence::StateStyle, crate::style::StyleSource::State);
+        s.set_color(
+            box_style::BACKGROUND,
+            accent_bg_pressed,
+            StylePrecedence::StateStyle,
+            crate::style::StyleSource::State,
+        );
     });
     b.state(WidgetState::new().focused(), |s| {
-        s.set_f32(box_style::BORDER_WIDTH, 2.0, StylePrecedence::StateStyle, crate::style::StyleSource::State);
-        s.set_color(box_style::BORDER_COLOR, hex(ACCENT, 0.55), StylePrecedence::StateStyle, crate::style::StyleSource::State);
+        s.set_f32(
+            box_style::BORDER_WIDTH,
+            2.0,
+            StylePrecedence::StateStyle,
+            crate::style::StyleSource::State,
+        );
+        s.set_color(
+            box_style::BORDER_COLOR,
+            hex(ACCENT, 0.55),
+            StylePrecedence::StateStyle,
+            crate::style::StyleSource::State,
+        );
     });
     b.state(WidgetState::new().disabled(), |s| {
-        s.set_f32(box_style::OPACITY, 0.5, StylePrecedence::StateStyle, crate::style::StyleSource::State);
-        s.set_color(box_style::BACKGROUND, bg_normal, StylePrecedence::StateStyle, crate::style::StyleSource::State);
-        s.set_color(text_style::COLOR, fg_disabled, StylePrecedence::StateStyle, crate::style::StyleSource::State);
+        s.set_f32(
+            box_style::OPACITY,
+            0.5,
+            StylePrecedence::StateStyle,
+            crate::style::StyleSource::State,
+        );
+        s.set_color(
+            box_style::BACKGROUND,
+            bg_normal,
+            StylePrecedence::StateStyle,
+            crate::style::StyleSource::State,
+        );
+        s.set_color(
+            text_style::COLOR,
+            fg_disabled,
+            StylePrecedence::StateStyle,
+            crate::style::StyleSource::State,
+        );
     });
 }
 
@@ -375,4 +560,3 @@ pub fn fluent_dark() -> Theme {
         .component(RecipeKey::base("button"), |b| button_recipe(b, true))
         .build()
 }
-

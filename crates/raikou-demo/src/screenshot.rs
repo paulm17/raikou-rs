@@ -57,12 +57,6 @@ pub fn capture_ui_to_png(
         flipped[dst_row * stride..(dst_row + 1) * stride].copy_from_slice(&pixels[src_range]);
     }
 
-    image::save_buffer(
-        out_path,
-        &flipped,
-        width,
-        height,
-        image::ColorType::Rgba8,
-    )
-    .map_err(|e| format!("failed to save {out_path}: {e}"))
+    image::save_buffer(out_path, &flipped, width, height, image::ColorType::Rgba8)
+        .map_err(|e| format!("failed to save {out_path}: {e}"))
 }

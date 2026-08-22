@@ -123,10 +123,7 @@ fn build_demo_panel(
     .transmute();
 
     // Loading and custom-content states.
-    let loading_button = Button::new()
-        .text("Save")
-        .is_loading(true)
-        .build(&mut cx);
+    let loading_button = Button::new().text("Save").is_loading(true).build(&mut cx);
     let loading_button_handle: Handle<UiNode> = loading_button.into();
 
     let content_box = BoxWidget::new()

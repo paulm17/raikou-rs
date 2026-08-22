@@ -16,12 +16,10 @@ fn build_demo_panel(
 ) -> Handle<UiNode> {
     let mut cx = BuildCx::new(ui, theme, registry);
 
-    let status: Handle<UiNode> = TextBuilder::new(
-        WidgetBuilder::new().with_name("raikou_status"),
-    )
-    .with_text("no interaction yet")
-    .build(&mut cx.ctx())
-    .to_base();
+    let status: Handle<UiNode> = TextBuilder::new(WidgetBuilder::new().with_name("raikou_status"))
+        .with_text("no interaction yet")
+        .build(&mut cx.ctx())
+        .to_base();
 
     // --- Accordion ---
     let accordion_content: Handle<UiNode> = TextBuilder::new(WidgetBuilder::new())
@@ -57,10 +55,7 @@ fn build_demo_panel(
         .tab("First", tab1)
         .tab("Second", tab2)
         .on_change(move |ui, index| {
-            ui.send(
-                status,
-                TextMessage::Text(format!("active tab -> {index}")),
-            );
+            ui.send(status, TextMessage::Text(format!("active tab -> {index}")));
         })
         .margin(Thickness::new(0.0, 0.0, 0.0, 16.0))
         .build(&mut cx);

@@ -24,11 +24,7 @@ pub fn tabs_panel(
 
     let overview: Handle<UiNode> = Stack::new()
         .spacing(10.0)
-        .child(
-            Label::new("Healthy")
-                .font_size(18.0)
-                .build(&mut cx),
-        )
+        .child(Label::new("Healthy").font_size(18.0).build(&mut cx))
         .child(
             Label::new("API latency and background jobs are within normal range.")
                 .font_size(13.0)
@@ -40,11 +36,7 @@ pub fn tabs_panel(
 
     let deployments: Handle<UiNode> = Stack::new()
         .spacing(10.0)
-        .child(
-            Label::new("3 queued")
-                .font_size(18.0)
-                .build(&mut cx),
-        )
+        .child(Label::new("3 queued").font_size(18.0).build(&mut cx))
         .child(
             Button::new()
                 .text("Open pipeline")
@@ -56,11 +48,7 @@ pub fn tabs_panel(
 
     let alerts: Handle<UiNode> = Stack::new()
         .spacing(10.0)
-        .child(
-            Label::new("2 unresolved")
-                .font_size(18.0)
-                .build(&mut cx),
-        )
+        .child(Label::new("2 unresolved").font_size(18.0).build(&mut cx))
         .child(
             Button::new()
                 .text("View incidents")

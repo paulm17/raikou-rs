@@ -16,12 +16,10 @@ fn build_demo_panel(
 ) -> Handle<UiNode> {
     let mut cx = BuildCx::new(ui, theme, registry);
 
-    let status: Handle<UiNode> = TextBuilder::new(
-        WidgetBuilder::new().with_name("raikou_status"),
-    )
-    .with_text("no interaction yet")
-    .build(&mut cx.ctx())
-    .to_base();
+    let status: Handle<UiNode> = TextBuilder::new(WidgetBuilder::new().with_name("raikou_status"))
+        .with_text("no interaction yet")
+        .build(&mut cx.ctx())
+        .to_base();
 
     let tree = Tree::new()
         .node(
@@ -39,7 +37,10 @@ fn build_demo_panel(
         .item_height(28.0)
         .margin(Thickness::new(0.0, 0.0, 0.0, 16.0))
         .on_select(move |ui, count| {
-            ui.send(status, TextMessage::Text(format!("selection -> {count} node(s)")));
+            ui.send(
+                status,
+                TextMessage::Text(format!("selection -> {count} node(s)")),
+            );
         })
         .build(&mut cx);
     let tree_handle: Handle<UiNode> = tree.into();
@@ -51,7 +52,11 @@ fn build_demo_panel(
     let heading_handle: Handle<UiNode> = heading.into();
 
     let hint = Label::new("Expand the nodes and click a leaf to select it.")
-        .color(theme.color("text.muted").unwrap_or(Color::new(0.4, 0.4, 0.4, 1.0)))
+        .color(
+            theme
+                .color("text.muted")
+                .unwrap_or(Color::new(0.4, 0.4, 0.4, 1.0)),
+        )
         .build(&mut cx);
     let hint_handle: Handle<UiNode> = hint.into();
 

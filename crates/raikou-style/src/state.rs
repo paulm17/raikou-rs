@@ -516,7 +516,7 @@ pub fn loading() -> WidgetState {
 
 #[cfg(test)]
 mod tests {
-    use super::{Pseudoclass, StatePriority, StateTracker, WidgetState, focused, hover, loading};
+    use super::{focused, hover, loading, Pseudoclass, StatePriority, StateTracker, WidgetState};
 
     #[test]
     fn dominant_state_prefers_disabled_over_other_interaction_states() {

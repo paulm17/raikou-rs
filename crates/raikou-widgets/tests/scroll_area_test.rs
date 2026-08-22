@@ -9,7 +9,11 @@ use fyrox::gui::scroll_viewer::ScrollViewerMessage;
 use raikou_core::Length;
 use raikou_widgets::ScrollArea;
 
-fn scroll(h: &mut Harness, handle: fyrox::core::pool::Handle<fyrox::gui::UiNode>, msg: ScrollViewerMessage) {
+fn scroll(
+    h: &mut Harness,
+    handle: fyrox::core::pool::Handle<fyrox::gui::UiNode>,
+    msg: ScrollViewerMessage,
+) {
     h.ui.send_message(
         UiMessage::with_data(msg)
             .with_destination(handle)
@@ -38,7 +42,11 @@ fn scroll_area_reports_offsets() {
             .build(cx)
     });
 
-    scroll(&mut h, area.handle, ScrollViewerMessage::VerticalScroll(42.0));
+    scroll(
+        &mut h,
+        area.handle,
+        ScrollViewerMessage::VerticalScroll(42.0),
+    );
     h.pump();
     assert_eq!(
         seen.borrow().last(),
@@ -46,7 +54,11 @@ fn scroll_area_reports_offsets() {
         "vertical scroll must report (v, h)"
     );
 
-    scroll(&mut h, area.handle, ScrollViewerMessage::HorizontalScroll(7.0));
+    scroll(
+        &mut h,
+        area.handle,
+        ScrollViewerMessage::HorizontalScroll(7.0),
+    );
     h.pump();
     assert_eq!(
         seen.borrow().last(),

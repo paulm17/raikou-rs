@@ -139,24 +139,19 @@ impl Slider {
 
         // Fluent restyle: thin track line + round thumb, no arrow buttons.
         {
+            use crate::convert::to_fyrox_color;
             use fyrox::gui::border::Border;
             use fyrox::gui::brush::Brush;
             use fyrox::gui::decorator::DecoratorMessage;
             use fyrox::gui::scroll_bar::ScrollBar;
             use fyrox::gui::widget::WidgetMessage;
-            use fyrox::gui::{HorizontalAlignment, VerticalAlignment};
             use fyrox::gui::Thickness as FyroxThickness;
-            use crate::convert::to_fyrox_color;
+            use fyrox::gui::{HorizontalAlignment, VerticalAlignment};
             use raikou_core::Color as RaikouColor;
 
             let theme = cx.theme().clone();
-            let token = |name: &str, fallback: RaikouColor| {
-                theme.color(name).unwrap_or(fallback)
-            };
-            let track_fill = token(
-                "border.default",
-                RaikouColor::new(0.0, 0.0, 0.0, 0.4),
-            );
+            let token = |name: &str, fallback: RaikouColor| theme.color(name).unwrap_or(fallback);
+            let track_fill = token("border.default", RaikouColor::new(0.0, 0.0, 0.0, 0.4));
             let thumb_fill = token("text.primary", RaikouColor::new(0.0, 0.0, 0.0, 1.0));
             let pressed_fill = token("accent.solid", RaikouColor::new(0.0, 0.47, 0.84, 1.0));
 
@@ -195,17 +190,22 @@ impl Slider {
             if let Some(body) = ui.node(handle).children().first().copied() {
                 if let Ok(border) = ui.try_get_mut_of_type::<Border>(body) {
                     *border.stroke_thickness = FyroxThickness::uniform(0.0).into();
-                    *border.background =
-                        Brush::Solid(to_fyrox_color(track_fill)).into();
+                    *border.background = Brush::Solid(to_fyrox_color(track_fill)).into();
                 }
                 match self.orientation {
                     Orientation::Horizontal => {
                         ui.send(body, WidgetMessage::Height(4.0));
-                        ui.send(body, WidgetMessage::VerticalAlignment(VerticalAlignment::Center));
+                        ui.send(
+                            body,
+                            WidgetMessage::VerticalAlignment(VerticalAlignment::Center),
+                        );
                     }
                     Orientation::Vertical => {
                         ui.send(body, WidgetMessage::Width(4.0));
-                        ui.send(body, WidgetMessage::HorizontalAlignment(HorizontalAlignment::Center));
+                        ui.send(
+                            body,
+                            WidgetMessage::HorizontalAlignment(HorizontalAlignment::Center),
+                        );
                     }
                 }
             }

@@ -54,8 +54,16 @@ impl HotReload {
         // For that reference to resolve on load, the built-in fonts must be
         // registered in the resource manager; otherwise the loader treats the UUID
         // as a file path and panics ("Font reader must be initialized!").
-        for font in [BUILT_IN_FONT.clone(), BUILT_IN_BOLD.clone(), BUILT_IN_ITALIC.clone(), BOLD_ITALIC.clone()] {
-            engine.resource_manager.state().register_built_in_resource(font);
+        for font in [
+            BUILT_IN_FONT.clone(),
+            BUILT_IN_BOLD.clone(),
+            BUILT_IN_ITALIC.clone(),
+            BOLD_ITALIC.clone(),
+        ] {
+            engine
+                .resource_manager
+                .state()
+                .register_built_in_resource(font);
         }
 
         let ui_resource: Resource<UserInterface> = engine.resource_manager.request(&ui_path);
@@ -127,7 +135,7 @@ impl HotReload {
         let result = {
             let mut guard = self.ui_resource.data_ref();
             match guard.as_loaded_mut() {
-                Some(ui) => Some(std::mem::replace(ui, UserInterface::default())),
+                Some(ui) => Some(std::mem::take(ui)),
                 None => None,
             }
         };

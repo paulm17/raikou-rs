@@ -6,21 +6,105 @@
 
 use std::rc::Rc;
 
+use fyrox::core::algebra::Vector2;
 use fyrox::core::pool::Handle;
+use fyrox::gui::brush::Brush;
+use fyrox::gui::check_box::{CheckBox, CheckBoxBuilder};
 use fyrox::gui::expander::{ExpanderBuilder, ExpanderMessage};
 use fyrox::gui::message::{MessageDirection, UiMessage};
 use fyrox::gui::stack_panel::StackPanelBuilder;
 use fyrox::gui::text::TextBuilder;
+use fyrox::gui::vector_image::{Primitive, VectorImageBuilder};
 use fyrox::gui::widget::WidgetBuilder;
-use fyrox::gui::{Orientation, UiNode, UserInterface};
+use fyrox::gui::{Orientation, UiNode, UserInterface, VerticalAlignment};
 
 use raikou_core::Thickness;
 
 use crate::build_cx::BuildCx;
 use crate::component::{Component, ComponentKind};
-use crate::convert::to_fyrox_thickness;
+use crate::convert::{to_fyrox_color, to_fyrox_thickness};
 
 type ToggleCallback = dyn Fn(&mut UserInterface, usize, bool);
+
+/// Builds the Fluent chevron marks: pointing down when expanded, right when
+/// collapsed. Drawn as vector lines colored `text.secondary` (no font or
+/// texture dependency). Shared by the accordion and tree restyling.
+///
+/// Marks come back centered within their host box.
+pub(crate) fn chevron_mark_nodes(
+    ctx: &mut fyrox::gui::BuildContext,
+    theme: &raikou_style::Theme,
+) -> (Handle<UiNode>, Handle<UiNode>) {
+    use fyrox::gui::HorizontalAlignment;
+
+    let fallback = raikou_core::Color::new(0.35, 0.35, 0.39, 1.0);
+    let color = to_fyrox_color(theme.color("text.secondary").unwrap_or(fallback));
+    let t = 1.5;
+    let down = vec![
+        Primitive::Line {
+            begin: Vector2::new(2.0, 3.5),
+            end: Vector2::new(5.0, 6.5),
+            thickness: t,
+        },
+        Primitive::Line {
+            begin: Vector2::new(5.0, 6.5),
+            end: Vector2::new(8.0, 3.5),
+            thickness: t,
+        },
+    ];
+    let right = vec![
+        Primitive::Line {
+            begin: Vector2::new(3.5, 2.0),
+            end: Vector2::new(6.5, 5.0),
+            thickness: t,
+        },
+        Primitive::Line {
+            begin: Vector2::new(6.5, 5.0),
+            end: Vector2::new(3.5, 8.0),
+            thickness: t,
+        },
+    ];
+    let mark = |prims: Vec<Primitive>, ctx: &mut fyrox::gui::BuildContext| -> Handle<UiNode> {
+        VectorImageBuilder::new(
+            WidgetBuilder::new()
+                .with_width(10.0)
+                .with_height(10.0)
+                .with_horizontal_alignment(HorizontalAlignment::Center)
+                .with_vertical_alignment(VerticalAlignment::Center)
+                .with_foreground(Brush::Solid(color).into()),
+        )
+        .with_primitives(prims)
+        .build(ctx)
+        .to_base()
+    };
+    (mark(down, ctx), mark(right, ctx))
+}
+
+/// Builds the Fluent expander checkbox: bare chevron marks on a transparent
+/// background (no stock button chrome).
+pub(crate) fn fluent_expander_checkbox(
+    ctx: &mut fyrox::gui::BuildContext,
+    theme: &raikou_style::Theme,
+    expanded: bool,
+) -> Handle<CheckBox> {
+    let (check_mark, uncheck_mark) = chevron_mark_nodes(ctx, theme);
+    CheckBoxBuilder::new(WidgetBuilder::new().with_vertical_alignment(VerticalAlignment::Center))
+        .with_check_mark(check_mark)
+        .with_uncheck_mark(uncheck_mark)
+        .with_background(
+            fyrox::gui::border::BorderBuilder::new(
+                WidgetBuilder::new()
+                    .with_min_size(Vector2::new(10.0, 10.0))
+                    .with_background(Brush::Solid(fyrox::core::color::Color::TRANSPARENT).into())
+                    .with_foreground(Brush::Solid(fyrox::core::color::Color::TRANSPARENT).into()),
+            )
+            .with_stroke_thickness(fyrox::gui::Thickness::zero().into())
+            .with_pad_by_corner_radius(false)
+            .build(ctx),
+        )
+        .checked(Some(expanded))
+        .build(ctx)
+}
 
 /// Handlers for one expander item within an [`Accordion`].
 #[derive(Clone)]
@@ -148,6 +232,7 @@ impl Accordion {
 
     /// Builds the accordion, adds it to the UI and registers its handlers.
     pub fn build(self, cx: &mut BuildCx) -> Component {
+        let theme = cx.theme().clone();
         let mut expander_handles: Vec<Handle<UiNode>> = Vec::new();
 
         for item in &self.items {
@@ -163,8 +248,10 @@ impl Accordion {
 
             let expander = {
                 let mut ctx = cx.ctx();
-                let mut builder =
-                    ExpanderBuilder::new(WidgetBuilder::new()).with_header(header);
+                let checkbox = fluent_expander_checkbox(&mut ctx, &theme, item.expanded);
+                let mut builder = ExpanderBuilder::new(WidgetBuilder::new())
+                    .with_header(header)
+                    .with_checkbox(checkbox);
                 if item.expanded {
                     builder = builder.with_expanded(true);
                 }

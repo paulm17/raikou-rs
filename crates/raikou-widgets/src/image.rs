@@ -222,7 +222,10 @@ impl Image {
 
         let component = Component {
             handle: wrapper,
-            kind: ComponentKind::Image(ImageHandlers { fit: self.fit, inner }),
+            kind: ComponentKind::Image(ImageHandlers {
+                fit: self.fit,
+                inner,
+            }),
         };
         cx.register(&component);
         component
@@ -260,8 +263,18 @@ pub fn set_image_texture(
 }
 
 /// Sizes and positions the inner image to `fit_rect(source_size, wrapper_bounds)`.
-fn apply_fit(ui: &mut UserInterface, wrapper: Handle<UiNode>, inner: Handle<UiNode>, fit: ImageFit) {
-    let bounds = Rect::from_xywh(0.0, 0.0, ui.node(wrapper).width(), ui.node(wrapper).height());
+fn apply_fit(
+    ui: &mut UserInterface,
+    wrapper: Handle<UiNode>,
+    inner: Handle<UiNode>,
+    fit: ImageFit,
+) {
+    let bounds = Rect::from_xywh(
+        0.0,
+        0.0,
+        ui.node(wrapper).width(),
+        ui.node(wrapper).height(),
+    );
     let source = ui
         .node(inner)
         .cast::<FyroxImage>()
@@ -270,10 +283,10 @@ fn apply_fit(ui: &mut UserInterface, wrapper: Handle<UiNode>, inner: Handle<UiNo
 
     ui.send(inner, WidgetMessage::Width(fitted.width()));
     ui.send(inner, WidgetMessage::Height(fitted.height()));
-    ui.send(inner, WidgetMessage::DesiredPosition(Vector2::new(
-        fitted.x(),
-        fitted.y(),
-    )));
+    ui.send(
+        inner,
+        WidgetMessage::DesiredPosition(Vector2::new(fitted.x(), fitted.y())),
+    );
 }
 
 /// Reads the pixel size of a rectangle texture, when it is loaded.

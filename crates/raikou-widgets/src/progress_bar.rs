@@ -80,12 +80,16 @@ impl ProgressBar {
     /// Builds the progress bar and adds it to the UI.
     pub fn build(self, cx: &mut BuildCx) -> Component {
         let width = self.width.resolve().unwrap_or(200.0);
-        let track_color = self
-            .track_color
-            .unwrap_or_else(|| cx.theme().color("surface.muted").unwrap_or(Color::new(0.88, 0.89, 0.91, 1.0)));
-        let fill_color = self
-            .fill_color
-            .unwrap_or_else(|| cx.theme().color("accent.solid").unwrap_or(Color::new(0.13, 0.39, 0.94, 1.0)));
+        let track_color = self.track_color.unwrap_or_else(|| {
+            cx.theme()
+                .color("surface.muted")
+                .unwrap_or(Color::new(0.88, 0.89, 0.91, 1.0))
+        });
+        let fill_color = self.fill_color.unwrap_or_else(|| {
+            cx.theme()
+                .color("accent.solid")
+                .unwrap_or(Color::new(0.13, 0.39, 0.94, 1.0))
+        });
 
         let handle: Handle<UiNode> = {
             let mut ctx = cx.ctx();

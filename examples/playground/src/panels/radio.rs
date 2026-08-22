@@ -32,11 +32,7 @@ pub fn radio_panel(
                 .build(&mut cx),
         )
         .child(Radio::new().text("Weekly summary").build(&mut cx))
-        .child(
-            Radio::new()
-                .text("Only critical outages")
-                .build(&mut cx),
-        )
+        .child(Radio::new().text("Only critical outages").build(&mut cx))
         .child(Radio::new().text("Never").build(&mut cx))
         .build(&mut cx)
         .into();

@@ -19,10 +19,7 @@ fn radio_check_message_invokes_callback() {
             .build(cx)
     });
 
-    h.ui.send(
-        r.handle,
-        CheckBoxMessage::Check(Some(true)),
-    );
+    h.ui.send(r.handle, CheckBoxMessage::Check(Some(true)));
     h.pump();
     assert!(seen.get(), "Check(Some(true)) must fire on_change(true)");
 }
@@ -46,20 +43,14 @@ fn radio_group_selects_and_deselects_siblings() {
     assert_eq!(options.len(), 3, "group must build one option per label");
 
     // Selecting item 2 must report index 2 ...
-    h.ui.send(
-        options[2],
-        CheckBoxMessage::Check(Some(true)),
-    );
+    h.ui.send(options[2], CheckBoxMessage::Check(Some(true)));
     h.pump();
     assert_eq!(picked.get(), 2, "group callback must receive the new index");
 
     // ... and the previously selected sibling (item 0) must have been sent
     // Check(Some(false)). Deselecting must NOT re-fire the group callback.
     let before = picked.get();
-    h.ui.send(
-        options[0],
-        CheckBoxMessage::Check(Some(false)),
-    );
+    h.ui.send(options[0], CheckBoxMessage::Check(Some(false)));
     h.pump();
     assert_eq!(
         picked.get(),
@@ -68,10 +59,7 @@ fn radio_group_selects_and_deselects_siblings() {
     );
 
     // Selecting another option moves the selection.
-    h.ui.send(
-        options[1],
-        CheckBoxMessage::Check(Some(true)),
-    );
+    h.ui.send(options[1], CheckBoxMessage::Check(Some(true)));
     h.pump();
     assert_eq!(picked.get(), 1);
 }

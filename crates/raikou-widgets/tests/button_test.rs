@@ -15,13 +15,22 @@ fn button_click_release_mode() {
     let mut h = Harness::new();
     let clicks = Counter::new();
     let c = clicks.clone();
-    let button = h.build(move |cx| Button::new().text("Save").on_click(move |_, _| c.bump()).build(cx));
+    let button = h.build(move |cx| {
+        Button::new()
+            .text("Save")
+            .on_click(move |_, _| c.bump())
+            .build(cx)
+    });
 
     // Release mode fires on the synthetic Click message the native button
     // emits after a real press/release pair.
     h.ui.send(button.handle, ButtonMessage::Click);
     h.pump();
-    assert_eq!(clicks.get(), 1, "on_click should fire on ButtonMessage::Click");
+    assert_eq!(
+        clicks.get(),
+        1,
+        "on_click should fire on ButtonMessage::Click"
+    );
 }
 
 #[test]
@@ -40,7 +49,7 @@ fn button_click_press_mode() {
     h.ui.send(
         button.handle,
         WidgetMessage::MouseDown {
-                        pos: Default::default(),
+            pos: Default::default(),
             button: MouseButton::Left,
         },
     );
@@ -51,7 +60,7 @@ fn button_click_press_mode() {
     h.ui.send(
         button.handle,
         WidgetMessage::MouseDown {
-                        pos: Default::default(),
+            pos: Default::default(),
             button: MouseButton::Right,
         },
     );
@@ -139,7 +148,7 @@ fn button_loading_suppresses_interaction() {
     h.ui.send(
         button.handle,
         WidgetMessage::MouseDown {
-                        pos: Default::default(),
+            pos: Default::default(),
             button: MouseButton::Left,
         },
     );

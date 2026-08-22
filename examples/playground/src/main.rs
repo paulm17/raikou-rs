@@ -320,10 +320,20 @@ fn build_app(
     };
 
     // Initial selection: Button (entry 1). Applied once messages pump.
+    // RAIKOU_PANEL=<name> selects a sidebar entry by name (used by shot.sh).
     {
         let sel = Rc::clone(&selection);
         let theme = theme.clone();
-        select(&sel, ui, &theme, 2); // Button
+        let index = std::env::var("RAIKOU_PANEL")
+            .ok()
+            .and_then(|name| {
+                PANELS
+                    .iter()
+                    .position(|(label, _)| label.eq_ignore_ascii_case(&name))
+            })
+            .map(|panel| panel + 1) // entry 0 is Home
+            .unwrap_or(2); // Button
+        select(&sel, ui, &theme, index);
     }
 
     root

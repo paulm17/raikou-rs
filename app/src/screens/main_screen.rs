@@ -54,13 +54,7 @@ pub const LIST_ROW_HEIGHT: f32 = 22.0;
 pub fn build(ui: &mut UserInterface) -> MainScreen {
     // Build the virtualized list first: it needs its own `build_ctx` borrow, which
     // must not overlap with the `ctx` borrow used for the rest of the form below.
-    let virtual_list = VirtualList::build(
-        ui,
-        360.0,
-        260.0,
-        LIST_TOTAL_ROWS,
-        LIST_ROW_HEIGHT,
-    );
+    let virtual_list = VirtualList::build(ui, 360.0, 260.0, LIST_TOTAL_ROWS, LIST_ROW_HEIGHT);
     let list_scroll_viewer: Handle<UiNode> = virtual_list.scroll_viewer;
 
     let ctx = &mut ui.build_ctx();
@@ -212,18 +206,21 @@ pub fn build(ui: &mut UserInterface) -> MainScreen {
     .build(ctx);
 
     // 3D scene controls: three toggles mirroring the Scene3D flags.
-    let spin_text: Handle<UiNode> = TextBuilder::new(WidgetBuilder::new().with_margin(Thickness::uniform(4.0)))
-        .with_text("Rotate cube")
-        .build(ctx)
-        .transmute();
-    let orbit_text: Handle<UiNode> = TextBuilder::new(WidgetBuilder::new().with_margin(Thickness::uniform(4.0)))
-        .with_text("Orbit camera")
-        .build(ctx)
-        .transmute();
-    let always_text: Handle<UiNode> = TextBuilder::new(WidgetBuilder::new().with_margin(Thickness::uniform(4.0)))
-        .with_text("Always spin")
-        .build(ctx)
-        .transmute();
+    let spin_text: Handle<UiNode> =
+        TextBuilder::new(WidgetBuilder::new().with_margin(Thickness::uniform(4.0)))
+            .with_text("Rotate cube")
+            .build(ctx)
+            .transmute();
+    let orbit_text: Handle<UiNode> =
+        TextBuilder::new(WidgetBuilder::new().with_margin(Thickness::uniform(4.0)))
+            .with_text("Orbit camera")
+            .build(ctx)
+            .transmute();
+    let always_text: Handle<UiNode> =
+        TextBuilder::new(WidgetBuilder::new().with_margin(Thickness::uniform(4.0)))
+            .with_text("Always spin")
+            .build(ctx)
+            .transmute();
 
     let toggle_spin: Handle<UiNode> = ToggleButtonBuilder::new(
         WidgetBuilder::new()
@@ -271,13 +268,12 @@ pub fn build(ui: &mut UserInterface) -> MainScreen {
     .transmute();
 
     // List tab content: header + the virtualized dense list.
-    let list_header: Handle<UiNode> = TextBuilder::new(
-        WidgetBuilder::new().with_margin(Thickness::uniform(4.0)),
-    )
-    .with_text(format!("Dense list — {LIST_TOTAL_ROWS} rows"))
-    .with_font_size(16.0.into())
-    .build(ctx)
-    .transmute();
+    let list_header: Handle<UiNode> =
+        TextBuilder::new(WidgetBuilder::new().with_margin(Thickness::uniform(4.0)))
+            .with_text(format!("Dense list — {LIST_TOTAL_ROWS} rows"))
+            .with_font_size(16.0.into())
+            .build(ctx)
+            .transmute();
 
     let list_content: Handle<UiNode> = StackPanelBuilder::new(
         WidgetBuilder::new()
@@ -308,32 +304,31 @@ pub fn build(ui: &mut UserInterface) -> MainScreen {
             .transmute()
     };
 
-    let tabs: Handle<UiNode> = TabControlBuilder::new(
-        WidgetBuilder::new().with_name("tabs").with_height(420.0),
-    )
-    .with_tab(TabDefinition {
-        uuid: Uuid::new_v4(),
-        header: tab("Form"),
-        content: form_content,
-        can_be_closed: false,
-        user_data: None,
-    })
-    .with_tab(TabDefinition {
-        uuid: Uuid::new_v4(),
-        header: tab("List"),
-        content: list_content,
-        can_be_closed: false,
-        user_data: None,
-    })
-    .with_tab(TabDefinition {
-        uuid: Uuid::new_v4(),
-        header: tab("3D"),
-        content: scene_content,
-        can_be_closed: false,
-        user_data: None,
-    })
-    .build(ctx)
-    .transmute();
+    let tabs: Handle<UiNode> =
+        TabControlBuilder::new(WidgetBuilder::new().with_name("tabs").with_height(420.0))
+            .with_tab(TabDefinition {
+                uuid: Uuid::new_v4(),
+                header: tab("Form"),
+                content: form_content,
+                can_be_closed: false,
+                user_data: None,
+            })
+            .with_tab(TabDefinition {
+                uuid: Uuid::new_v4(),
+                header: tab("List"),
+                content: list_content,
+                can_be_closed: false,
+                user_data: None,
+            })
+            .with_tab(TabDefinition {
+                uuid: Uuid::new_v4(),
+                header: tab("3D"),
+                content: scene_content,
+                can_be_closed: false,
+                user_data: None,
+            })
+            .build(ctx)
+            .transmute();
 
     let root = StackPanelBuilder::new(
         WidgetBuilder::new()
@@ -419,7 +414,7 @@ impl MainScreen {
             name: name.to_string(),
             clicks,
         };
-MainScreen::make_tab_backdrop_transparent(ui, tabs);
+        MainScreen::make_tab_backdrop_transparent(ui, tabs);
         screen
     }
 
@@ -473,8 +468,14 @@ MainScreen::make_tab_backdrop_transparent(ui, tabs);
                 self.name.clear();
                 self.clicks = 0;
                 ui.send(self.name_field, TextMessage::Text(String::new()));
-                ui.send(self.counter_label, TextMessage::Text("clicks: 0".to_string()));
-                ui.send(self.greeting_label, TextMessage::Text("Hello, !".to_string()));
+                ui.send(
+                    self.counter_label,
+                    TextMessage::Text("clicks: 0".to_string()),
+                );
+                ui.send(
+                    self.greeting_label,
+                    TextMessage::Text("Hello, !".to_string()),
+                );
             }
         }
 

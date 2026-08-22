@@ -82,8 +82,7 @@ fn build_demo_panel(
     // The code generator is created first so every handler can refresh the
     // code panel through it.
     let code_state = Rc::clone(&state);
-    let code_fn: Rc<dyn Fn() -> String> =
-        Rc::new(move || build_code(&code_state.borrow().clone()));
+    let code_fn: Rc<dyn Fn() -> String> = Rc::new(move || build_code(&code_state.borrow().clone()));
 
     // --- code panel -------------------------------------------------------
     let code_fn_for_block = Rc::clone(&code_fn);
@@ -136,12 +135,11 @@ fn build_demo_panel(
     {
         use fyrox::gui::message::UiMessage;
         use fyrox::gui::widget::WidgetMessage;
-        for handle in [bubble, value_label.into(), slider_handle] {
-            cx.ui().send_message(
-                UiMessage::for_widget(handle, WidgetMessage::HorizontalAlignment(
-                    fyrox::gui::HorizontalAlignment::Center,
-                )),
-            );
+        for handle in [bubble, value_label, slider_handle] {
+            cx.ui().send_message(UiMessage::for_widget(
+                handle,
+                WidgetMessage::HorizontalAlignment(fyrox::gui::HorizontalAlignment::Center),
+            ));
         }
     }
 
@@ -232,10 +230,8 @@ fn build_demo_panel(
         .code_height(280.0)
         .build(&mut cx);
     let shell_handle: Handle<UiNode> = shell.into();
-    cx.ui()
-        .send(shell_handle, WidgetMessage::Width(980.0));
-    cx.ui()
-        .send(shell_handle, WidgetMessage::Height(820.0));
+    cx.ui().send(shell_handle, WidgetMessage::Width(980.0));
+    cx.ui().send(shell_handle, WidgetMessage::Height(820.0));
     shell_handle
 }
 

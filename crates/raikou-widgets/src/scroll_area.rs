@@ -38,7 +38,8 @@ impl ScrollAreaHandlers {
             return;
         }
         let mut changed = None;
-        if let Some(ScrollViewerMessage::VerticalScroll(v)) = message.data::<ScrollViewerMessage>() {
+        if let Some(ScrollViewerMessage::VerticalScroll(v)) = message.data::<ScrollViewerMessage>()
+        {
             self.v_offset.set(*v);
             changed = Some((*v, self.h_offset.get()));
         } else if let Some(ScrollViewerMessage::HorizontalScroll(h)) =
@@ -174,6 +175,121 @@ impl ScrollArea {
             let mut ctx = cx.ctx();
             builder.build(&mut ctx).to_base()
         };
+
+        // Fluent overlay scrollbars: hide the arrow buttons, draw a thin
+        // rounded thumb (4px cross-axis) and make the track invisible so only
+        // the thumb floats over content. Applied to both axes when present.
+        // fyrox keeps enforcing its minimum thumb size internally.
+        {
+            use crate::convert::to_fyrox_color;
+            use fyrox::graph::SceneGraph;
+            use fyrox::gui::border::Border;
+            use fyrox::gui::brush::Brush;
+            use fyrox::gui::decorator::DecoratorMessage;
+            use fyrox::gui::scroll_bar::ScrollBar;
+            use fyrox::gui::widget::WidgetMessage;
+            use fyrox::gui::{HorizontalAlignment, Orientation, VerticalAlignment};
+            use raikou_core::Color as RaikouColor;
+
+            const THICKNESS: f32 = 4.0;
+
+            let theme = cx.theme().clone();
+            let token = |name: &str, fallback: RaikouColor| theme.color(name).unwrap_or(fallback);
+            let normal_fill = token("text.secondary", RaikouColor::new(0.35, 0.35, 0.39, 1.0));
+            let hover_fill = token("text.primary", RaikouColor::new(0.10, 0.10, 0.10, 1.0));
+            let pressed_fill = token("accent.solid", RaikouColor::new(0.0, 0.47, 0.84, 1.0));
+
+            // Find both ScrollBars (vertical + horizontal) under the viewer.
+            let bars: Vec<Handle<UiNode>> = {
+                let ui = cx.ui();
+                let mut stack = vec![handle];
+                let mut visited = vec![handle];
+                let mut bars = Vec::new();
+                while let Some(h) = stack.pop() {
+                    if h.is_none() {
+                        continue;
+                    }
+                    if ui.try_get_of_type::<ScrollBar>(h).is_ok() {
+                        bars.push(h);
+                    }
+                    for child in ui.node(h).children().to_vec() {
+                        if !child.is_none() && !visited.contains(&child) {
+                            visited.push(child);
+                            stack.push(child);
+                        }
+                    }
+                }
+                bars
+            };
+
+            for bar in bars {
+                // Read the bar's internals first (immutable scope).
+                let (increase, decrease, indicator, vertical) = {
+                    let ui = cx.ui();
+                    match ui.try_get_of_type::<ScrollBar>(bar) {
+                        Ok(sb) => (
+                            *sb.increase,
+                            *sb.decrease,
+                            *sb.indicator,
+                            *sb.orientation == Orientation::Vertical,
+                        ),
+                        Err(_) => continue,
+                    }
+                };
+                let ui = cx.ui();
+
+                ui.send(increase, WidgetMessage::Visibility(false));
+                ui.send(decrease, WidgetMessage::Visibility(false));
+
+                // Thumb: thin rounded line on the cross axis.
+                if vertical {
+                    ui.send(indicator, WidgetMessage::Width(THICKNESS));
+                    ui.send(
+                        indicator,
+                        WidgetMessage::HorizontalAlignment(HorizontalAlignment::Center),
+                    );
+                } else {
+                    ui.send(indicator, WidgetMessage::Height(THICKNESS));
+                    ui.send(
+                        indicator,
+                        WidgetMessage::VerticalAlignment(VerticalAlignment::Center),
+                    );
+                }
+                if let Ok(border) = ui.try_get_mut_of_type::<Border>(indicator) {
+                    *border.corner_radius = (THICKNESS * 0.5).into();
+                    *border.stroke_thickness = fyrox::gui::Thickness::uniform(0.0).into();
+                }
+                ui.send(
+                    indicator,
+                    DecoratorMessage::NormalBrush(Brush::Solid(to_fyrox_color(normal_fill)).into()),
+                );
+                ui.send(
+                    indicator,
+                    DecoratorMessage::HoverBrush(Brush::Solid(to_fyrox_color(hover_fill)).into()),
+                );
+                ui.send(
+                    indicator,
+                    DecoratorMessage::PressedBrush(
+                        Brush::Solid(to_fyrox_color(pressed_fill)).into(),
+                    ),
+                );
+                ui.send(
+                    indicator,
+                    DecoratorMessage::SelectedBrush(
+                        Brush::Solid(to_fyrox_color(normal_fill)).into(),
+                    ),
+                );
+
+                // Track: fully transparent for the overlay look.
+                if let Some(body) = ui.node(bar).children().first().copied() {
+                    if let Ok(border) = ui.try_get_mut_of_type::<Border>(body) {
+                        *border.stroke_thickness = fyrox::gui::Thickness::uniform(0.0).into();
+                        *border.background =
+                            Brush::Solid(fyrox::core::color::Color::TRANSPARENT).into();
+                    }
+                }
+            }
+        }
 
         let component = Component {
             handle,

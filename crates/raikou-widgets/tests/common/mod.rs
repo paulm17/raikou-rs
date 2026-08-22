@@ -4,11 +4,11 @@
 
 use fyrox::core::algebra::Vector2;
 use fyrox::graph::SceneGraph;
-use fyrox::gui::UserInterface;
 use fyrox::gui::UiUpdateSwitches;
-use std::rc::Rc;
+use fyrox::gui::UserInterface;
 use raikou_style::Theme;
 use raikou_widgets::{BuildCx, Component, ComponentRegistry};
+use std::rc::Rc;
 
 pub struct Harness {
     pub ui: UserInterface,

@@ -123,8 +123,7 @@ pub fn button_panel(
     let state = Rc::new(RefCell::new(PlaygroundState::default()));
 
     let code_state = Rc::clone(&state);
-    let code_fn: Rc<dyn Fn() -> String> =
-        Rc::new(move || build_code(&code_state.borrow().clone()));
+    let code_fn: Rc<dyn Fn() -> String> = Rc::new(move || build_code(&code_state.borrow().clone()));
 
     let code_fn_for_block = Rc::clone(&code_fn);
     let code_handle = PlaygroundCodeBlock::new(move || code_fn_for_block()).build(&mut cx);
@@ -279,17 +278,47 @@ pub fn button_panel(
                 .color(primary)
                 .build(&mut cx),
         )
-        .child(Label::new("Label").font_size(12.0).color(muted).build(&mut cx))
+        .child(
+            Label::new("Label")
+                .font_size(12.0)
+                .color(muted)
+                .build(&mut cx),
+        )
         .child(label_input)
-        .child(Label::new("Variant").font_size(12.0).color(muted).build(&mut cx))
+        .child(
+            Label::new("Variant")
+                .font_size(12.0)
+                .color(muted)
+                .build(&mut cx),
+        )
         .child(variant_select)
-        .child(Label::new("Color").font_size(12.0).color(muted).build(&mut cx))
+        .child(
+            Label::new("Color")
+                .font_size(12.0)
+                .color(muted)
+                .build(&mut cx),
+        )
         .child(color_select)
-        .child(Label::new("Size").font_size(12.0).color(muted).build(&mut cx))
+        .child(
+            Label::new("Size")
+                .font_size(12.0)
+                .color(muted)
+                .build(&mut cx),
+        )
         .child(size_slider)
-        .child(Label::new("Width").font_size(12.0).color(muted).build(&mut cx))
+        .child(
+            Label::new("Width")
+                .font_size(12.0)
+                .color(muted)
+                .build(&mut cx),
+        )
         .child(width_slider)
-        .child(Label::new("Radius").font_size(12.0).color(muted).build(&mut cx))
+        .child(
+            Label::new("Radius")
+                .font_size(12.0)
+                .color(muted)
+                .build(&mut cx),
+        )
         .child(radius_slider)
         .child(loading_switch)
         .child(enabled_switch)

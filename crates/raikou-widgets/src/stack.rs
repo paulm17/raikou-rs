@@ -3,7 +3,7 @@
 use fyrox::core::pool::Handle;
 use fyrox::gui::stack_panel::StackPanelBuilder;
 use fyrox::gui::widget::{WidgetBuilder, WidgetMessage};
-use fyrox::gui::{UiNode};
+use fyrox::gui::UiNode;
 
 use raikou_core::Thickness;
 
