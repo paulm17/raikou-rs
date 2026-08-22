@@ -19,29 +19,9 @@ members = [
     "examples/tree_demo",
     "examples/table_demo",
     "examples/loading_demo",
+    "examples/playground",
     "examples/playground_demo",
-    "examples/combobox_playground",
-    "examples/context_menu_playground",
-    "examples/label_playground",
-    "examples/loading_indicator_playground",
-    "examples/menu_playground",
-    "examples/progress_bar_playground",
-    "examples/radio_playground",
-    "examples/scroll_area_playground",
-    "examples/step_input_playground",
-    "examples/switch_playground",
-    "examples/table_playground",
-    "examples/tabs_playground",
-    "examples/text_area_playground",
-    "examples/text_input_playground",
-    "examples/tree_playground",
-    "examples/popover_playground",
-    "examples/button_playground",
-    "examples/checkbox_playground",
-    "examples/select_playground",
-    "examples/accordion_playground",
-    "examples/image_playground",
-]
+                                                                                    ]
 default-members = ["app"]
 
 [workspace.package]

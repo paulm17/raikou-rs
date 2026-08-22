@@ -109,18 +109,26 @@ pub fn run(options: Options, build: Box<PanelBuilder>) {
 
     let mut registry = ComponentRegistry::default();
     // RAIKOU_THEME=light|dark selects the Avalonia Fluent variant (default: light).
-    let theme = match std::env::var("RAIKOU_THEME").as_deref() {
-        Ok("dark") => Theme::fluent_dark(),
-        _ => Theme::fluent_light(),
+    let dark = matches!(std::env::var("RAIKOU_THEME").as_deref(), Ok("dark"));
+    let theme = if dark {
+        Theme::fluent_dark()
+    } else {
+        Theme::fluent_light()
     };
+    eprintln!(
+        "raikou: Avalonia Fluent {} theme (set RAIKOU_THEME={} to switch)",
+        if dark { "dark" } else { "light" },
+        if dark { "light" } else { "dark" }
+    );
     {
         // Map the theme onto fyrox's global style so all natively-styled
         // widgets (text boxes, dropdowns, decorators...) inherit Fluent
         // colors instead of the stock dark palette.
         use raikou_style::theme::fyrox_bridge::fluent_fyrox_style_resource;
-        engine.user_interfaces.first_mut().set_style(
-            fluent_fyrox_style_resource(&theme, matches!(std::env::var("RAIKOU_THEME").as_deref(), Ok("dark"))),
-        );
+        engine
+            .user_interfaces
+            .first_mut()
+            .set_style(fluent_fyrox_style_resource(&theme, dark));
     }
     let panel = build(engine.user_interfaces.first_mut(), &theme, &mut registry);
     {
@@ -128,8 +136,14 @@ pub fn run(options: Options, build: Box<PanelBuilder>) {
         let root = ui.root();
         let mut ctx = ui.build_ctx();
         ctx.link(panel, root);
+        // The UI root is a free-form Canvas that arranges children at their
+        // desired size, so the app panel must be sized explicitly or every
+        // unpainted region of the window shows the raw clear color.
+        ui.send(panel, WidgetMessage::Width(options.width as f32));
+        ui.send(panel, WidgetMessage::Height(options.height as f32));
         ui.need_render = true;
     }
+    let app_panel = panel;
 
     // Screenshot-harness support: exit automatically after N seconds so
     // scripts/shot.sh can capture a window without killing the process.
@@ -231,7 +245,7 @@ pub fn run(options: Options, build: Box<PanelBuilder>) {
                             let logical_size = size.to_logical(window.scale_factor());
                             let ui = engine.user_interfaces.first_mut();
                             ui.send_many(
-                                ui.root(),
+                                app_panel,
                                 [
                                     WidgetMessage::Width(logical_size.width),
                                     WidgetMessage::Height(logical_size.height),
@@ -264,11 +278,19 @@ pub fn run(options: Options, build: Box<PanelBuilder>) {
                                         &mut engine.graphics_context
                                     {
                                         let size = ctx.window.inner_size();
-                                        let clear = match std::env::var("RAIKOU_THEME")
+                                        let clear = match std::env::var("RAIKOU_CLEAR")
                                             .as_deref()
                                         {
+                                            Ok("black") => Color::BLACK,
                                             Ok("dark") => Color::from_rgba(0x20, 0x20, 0x20, 255),
-                                            _ => Color::WHITE,
+                                            _ => match std::env::var("RAIKOU_THEME")
+                                                .as_deref()
+                                            {
+                                                Ok("dark") => {
+                                                    Color::from_rgba(0x20, 0x20, 0x20, 255)
+                                                }
+                                                _ => Color::WHITE,
+                                            },
                                         };
                                         let ui = engine.user_interfaces.first();
                                         if let Err(e) = screenshot::capture_ui_to_png(

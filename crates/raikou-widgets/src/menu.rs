@@ -69,7 +69,7 @@ pub(crate) fn style_menu_chrome(
             if !body.is_none() {
                 ui.send(body, fyrox::gui::widget::WidgetMessage::Background(elevated.clone().into()));
                 ui.send(body, fyrox::gui::widget::WidgetMessage::Foreground(stroke.clone().into()));
-                if let Ok(mut border) = ui.try_get_mut_of_type::<Border>(body) {
+                if let Ok(border) = ui.try_get_mut_of_type::<Border>(body) {
                     border.corner_radius.set_value_and_mark_modified(4.0f32.into());
                 }
             }

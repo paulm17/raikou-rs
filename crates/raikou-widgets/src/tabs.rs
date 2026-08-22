@@ -19,7 +19,7 @@ use uuid::Uuid;
 
 use crate::build_cx::BuildCx;
 use crate::component::{Component, ComponentKind};
-use crate::convert::to_fyrox_thickness;
+use crate::convert::{to_fyrox_color, to_fyrox_thickness};
 
 type ChangeCallback = dyn Fn(&mut UserInterface, usize);
 
@@ -139,6 +139,70 @@ impl Tabs {
             let mut ctx = cx.ctx();
             tab_builder.build(&mut ctx).to_base()
         };
+
+        // Fluent chrome: the stock TabControl paints a dark backdrop over
+        // headers + content and gives header decorators heavy gray fills.
+        // Strip those, give headers transparent/hover/selected brushes and pad
+        // the header labels for a comfortable hit target.
+        {
+            use fyrox::gui::brush::Brush;
+            use fyrox::gui::decorator::DecoratorMessage;
+            use fyrox::graph::SceneGraph;
+
+            let theme = cx.theme().clone();
+            let token_brush =
+                |name: &str| Brush::Solid(to_fyrox_color(theme.color(name).unwrap())).into();
+            let transparent = Brush::Solid(fyrox::core::color::Color::TRANSPARENT);
+            let transparent_prop: fyrox::gui::style::StyledProperty<Brush> = transparent.clone().into();
+            let ui = cx.ui();
+
+            let root_node = ui.node(handle);
+            let border_h = *root_node.children().first().expect("tab control border");
+            let grid_h = *ui.node(border_h).children().first().expect("tab control grid");
+            let headers_h = *ui.node(grid_h)
+                .children()
+                .first()
+                .expect("headers container");
+            ui.send(
+                border_h,
+                fyrox::gui::widget::WidgetMessage::Background(transparent_prop.clone()),
+            );
+            ui.send(
+                border_h,
+                fyrox::gui::widget::WidgetMessage::Foreground(transparent_prop.clone()),
+            );
+
+            for header_button in ui.node(headers_h).children().to_vec() {
+                // Decorators sit between the button and its content grid;
+                // decorator messages must target them directly.
+                let Some(decorator) = ui.node(header_button).children().first().copied() else {
+                    continue;
+                };
+                ui.send(
+                    decorator,
+                    DecoratorMessage::NormalBrush(transparent_prop.clone()),
+                );
+                ui.send(decorator, DecoratorMessage::HoverBrush(token_brush("fluent.list.low")));
+                ui.send(
+                    decorator,
+                    DecoratorMessage::PressedBrush(token_brush("fluent.list.medium")),
+                );
+                // Pad the header label so the tab is comfortably clickable.
+                if let Some(label) = ui.node(header_button).children().first().copied() {
+                    if ui.try_get_of_type::<fyrox::gui::text::Text>(label).is_ok() {
+                        ui.send(
+                            label,
+                            fyrox::gui::widget::WidgetMessage::Margin(fyrox::gui::Thickness {
+                                left: 12.0,
+                                top: 6.0,
+                                right: 12.0,
+                                bottom: 6.0,
+                            }),
+                        );
+                    }
+                }
+            }
+        }
 
         let component = Component {
             handle,
