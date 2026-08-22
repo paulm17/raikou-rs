@@ -57,23 +57,85 @@ struct Selection {
     buttons: Vec<Handle<UiNode>>,
 }
 
+/// Finds the first Text node under `root` (the label of a nav button).
+fn find_text_child(
+    ui: &UserInterface,
+    root: fyrox::core::pool::Handle<UiNode>,
+) -> Option<fyrox::core::pool::Handle<UiNode>> {
+    use fyrox::graph::SceneGraph;
+    let mut stack = vec![root];
+    while let Some(h) = stack.pop() {
+        if h.is_none() {
+            continue;
+        }
+        if ui.try_get_of_type::<fyrox::gui::text::Text>(h).is_ok() {
+            return Some(h);
+        }
+        for c in ui.node(h).children() {
+            stack.push(*c);
+        }
+    }
+    None
+}
+
 fn select(state: &RefCell<Selection>, ui: &mut UserInterface, theme: &Theme, index: usize) {
+    use fyrox::graph::SceneGraph;
+    use fyrox::gui::decorator::{Decorator, DecoratorMessage};
     let state = state.borrow();
-    let active = to_fyrox_color(
-        theme
-            .color("fluent.control.hover")
-            .unwrap_or(Color::new(0.9, 0.9, 0.9, 1.0)),
-    );
+    // Active pill = accent background + white label; inactive = transparent.
+    let accent = theme
+        .color("accent.solid")
+        .unwrap_or(Color::new(0.0, 0.47, 0.84, 1.0));
+    let accent_hover = theme
+        .color("accent.hover")
+        .unwrap_or(Color::new(0.26, 0.61, 0.89, 1.0));
+    let idle_text = theme
+        .color("text.primary")
+        .unwrap_or(Color::new(0.06, 0.06, 0.07, 1.0));
+    let hover_idle = theme.color("fluent.control.hover");
+    let pressed_idle = theme.color("fluent.control.pressed");
+    let prop = |c: fyrox::core::color::Color| Brush::Solid(c).into();
     for (i, (&host, &button)) in state.hosts.iter().zip(state.buttons.iter()).enumerate() {
-        ui.send(host, WidgetMessage::Visibility(i == index));
-        ui.send(
-            button,
-            WidgetMessage::Background(if i == index {
-                Brush::Solid(active).into()
+        let is_active = i == index;
+        ui.send(host, WidgetMessage::Visibility(is_active));
+
+        // The decorator paints the button; WidgetMessage::Background on the
+        // button itself is hidden behind it (see switch.rs).
+        let decorator = ui
+            .node(button)
+            .children()
+            .first()
+            .copied()
+            .filter(|h| ui.try_get_of_type::<Decorator>(*h).is_ok());
+        if let Some(decorator) = decorator {
+            let (normal, hover, pressed) = if is_active {
+                (
+                    to_fyrox_color(accent),
+                    to_fyrox_color(accent_hover),
+                    to_fyrox_color(theme.color("accent.pressed").unwrap_or(accent)),
+                )
             } else {
-                Brush::Solid(fyrox::core::color::Color::TRANSPARENT).into()
-            }),
-        );
+                (
+                    fyrox::core::color::Color::TRANSPARENT,
+                    to_fyrox_color(hover_idle.unwrap_or(Color::new(0.96, 0.96, 0.96, 1.0))),
+                    to_fyrox_color(pressed_idle.unwrap_or(Color::new(0.92, 0.92, 0.92, 1.0))),
+                )
+            };
+            ui.send(decorator, DecoratorMessage::NormalBrush(prop(normal)));
+            ui.send(decorator, DecoratorMessage::HoverBrush(prop(hover)));
+            ui.send(decorator, DecoratorMessage::PressedBrush(prop(pressed)));
+        }
+
+        if let Some(text) = find_text_child(ui, button) {
+            ui.send(
+                text,
+                WidgetMessage::Foreground(if is_active {
+                    prop(fyrox::core::color::Color::WHITE)
+                } else {
+                    prop(to_fyrox_color(idle_text))
+                }),
+            );
+        }
     }
 }
 
