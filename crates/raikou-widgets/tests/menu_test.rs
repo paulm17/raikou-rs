@@ -2,7 +2,7 @@
 
 mod common;
 
-use common::{Counter, Harness};
+use common::Harness;
 use fyrox::gui::menu::MenuItemMessage;
 use raikou_widgets::{ContextMenu, MenuBar, MenuItem};
 
@@ -11,7 +11,7 @@ fn menu_bar_reports_leaf_clicks() {
     let mut h = Harness::new();
     let seen = std::rc::Rc::new(std::cell::Cell::new(usize::MAX));
     let s = seen.clone();
-    let bar = h.build(move |cx| {
+    let _bar = h.build(move |cx| {
         MenuBar::new()
             .menu(
                 "File",
@@ -46,7 +46,7 @@ fn context_menu_reports_item_clicks() {
     let mut h = Harness::new();
     let seen = std::rc::Rc::new(std::cell::Cell::new(usize::MAX));
     let s = seen.clone();
-    let menu = h.build(move |cx| {
+    let _menu = h.build(move |cx| {
         ContextMenu::new()
             .item(MenuItem::new("Cut"))
             .item(MenuItem::new("Copy"))
@@ -55,7 +55,6 @@ fn context_menu_reports_item_clicks() {
             .build(cx)
     });
 
-    use fyrox::graph::SceneGraph;
     let items = collect_menu_items(&h.ui);
     assert_eq!(items.len(), 3);
 

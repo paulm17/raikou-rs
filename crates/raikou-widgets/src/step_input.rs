@@ -6,8 +6,9 @@
 use std::rc::Rc;
 
 use fyrox::core::pool::Handle;
+use fyrox::gui::brush::Brush;
 use fyrox::gui::message::{MessageDirection, UiMessage};
-use fyrox::gui::numeric::{NumericUpDownBuilder, NumericUpDownMessage};
+use fyrox::gui::numeric::{NumericUpDown, NumericUpDownBuilder, NumericUpDownMessage};
 use fyrox::gui::widget::WidgetBuilder;
 use fyrox::gui::{UiNode, UserInterface};
 
@@ -15,6 +16,7 @@ use raikou_core::Thickness;
 
 use crate::build_cx::BuildCx;
 use crate::component::{Component, ComponentKind};
+use crate::convert::to_fyrox_color;
 
 type ChangeCallback = dyn Fn(&mut UserInterface, f64);
 
@@ -159,6 +161,11 @@ impl StepInput {
             )
         };
 
+        // Fluent restyle: spinner plates are transparent until hovered and
+        // the glyphs become thin stroked chevrons in the theme text color
+        // (Avalonia NumericUpDown spinners).
+        fluent_spinner_buttons(&mut cx.ctx(), &theme, inner);
+
         let component = Component {
             handle,
             kind: ComponentKind::StepInput(StepInputHandlers {
@@ -177,6 +184,152 @@ impl StepInput {
             }),
         });
         component
+    }
+}
+
+/// Fluent restyle of the stock spinner buttons: plates are transparent until
+/// hovered (subtle list tint on hover/press, no stroke border) and the filled
+/// accent triangles become thin stroked chevrons in the theme's secondary
+/// text color.
+fn fluent_spinner_buttons(
+    ctx: &mut fyrox::gui::BuildContext,
+    theme: &raikou_style::Theme,
+    inner: Handle<UiNode>,
+) {
+    use fyrox::core::algebra::Vector2;
+    use fyrox::gui::button::{Button, ButtonMessage};
+    use fyrox::gui::decorator::Decorator;
+    use fyrox::gui::vector_image::{Primitive, VectorImage};
+
+    let buttons = {
+        let node = &ctx[inner];
+        let Some(numeric) = node.cast::<NumericUpDown<f64>>() else {
+            return;
+        };
+        let inc: Handle<UiNode> = (*numeric.increase).to_base();
+        let dec: Handle<UiNode> = (*numeric.decrease).to_base();
+        [(inc, true), (dec, false)]
+    };
+
+    let fallback_glyph = raikou_core::Color::new(0.35, 0.35, 0.39, 1.0);
+    let glyph = Brush::Solid(to_fyrox_color(
+        theme.color("text.secondary").unwrap_or(fallback_glyph),
+    ));
+    let fallback_low = raikou_core::Color::new(0.0, 0.0, 0.0, 0.05);
+    let hover_plate = Brush::Solid(to_fyrox_color(
+        theme.color("fluent.list.low").unwrap_or(fallback_low),
+    ));
+    let fallback_medium = raikou_core::Color::new(0.0, 0.0, 0.0, 0.10);
+    let pressed_plate = Brush::Solid(to_fyrox_color(
+        theme.color("fluent.list.medium").unwrap_or(fallback_medium),
+    ));
+    let transparent = Brush::Solid(fyrox::core::color::Color::TRANSPARENT);
+
+    // The stock numeric paints its own dark back border, which shows through
+    // around the spinners; the raikou field chrome already provides the
+    // Fluent chrome, so retire the stock fill and stroke.
+    let back_border = ctx[inner].children().first().copied();
+    if let Some(back) = back_border {
+        if let Some(b) = ctx[back].cast_mut::<fyrox::gui::border::Border>() {
+            b.widget
+                .background
+                .set_value_and_mark_modified(transparent.clone().into());
+            b.widget
+                .foreground
+                .set_value_and_mark_modified(transparent.clone().into());
+        }
+    }
+
+    let thickness = 1.5;
+    let up_prims = vec![
+        Primitive::Line {
+            begin: Vector2::new(1.5, 3.25),
+            end: Vector2::new(4.0, 0.75),
+            thickness,
+        },
+        Primitive::Line {
+            begin: Vector2::new(4.0, 0.75),
+            end: Vector2::new(6.5, 3.25),
+            thickness,
+        },
+    ];
+    let down_prims = vec![
+        Primitive::Line {
+            begin: Vector2::new(1.5, 1.75),
+            end: Vector2::new(4.0, 4.25),
+            thickness,
+        },
+        Primitive::Line {
+            begin: Vector2::new(4.0, 4.25),
+            end: Vector2::new(6.5, 1.75),
+            thickness,
+        },
+    ];
+
+    for (button, is_increase) in buttons {
+        if button.is_none() {
+            continue;
+        }
+
+        // Transparent-until-hover plate with no stroke border.
+        let (decorator, content) = {
+            let node = &ctx[button];
+            match node.cast::<Button>() {
+                Some(b) => (*b.decorator, *b.content),
+                None => continue,
+            }
+        };
+        if !decorator.is_none() {
+            if let Some(d) = ctx[decorator].cast_mut::<Decorator>() {
+                // The visible fill is the inner Border's background; clear it
+                // now (the brush fields below only apply on state changes).
+                d.border
+                    .widget
+                    .background
+                    .set_value_and_mark_modified(transparent.clone().into());
+                d.normal_brush
+                    .set_value_and_mark_modified(transparent.clone().into());
+                d.selected_brush
+                    .set_value_and_mark_modified(transparent.clone().into());
+                d.hover_brush
+                    .set_value_and_mark_modified(hover_plate.clone().into());
+                d.pressed_brush
+                    .set_value_and_mark_modified(pressed_plate.clone().into());
+                d.border
+                    .widget
+                    .foreground
+                    .set_value_and_mark_modified(transparent.clone().into());
+            }
+        }
+
+        // Swap the filled accent triangle for a thin stroked chevron.
+        if !content.is_none() {
+            if let Some(arrow) = ctx[content].cast_mut::<VectorImage>() {
+                arrow.primitives.set_value_and_mark_modified(
+                    if is_increase {
+                        up_prims.clone()
+                    } else {
+                        down_prims.clone()
+                    },
+                );
+                arrow.widget.set_width(8.0);
+                arrow.widget.set_height(5.0);
+                arrow
+                    .widget
+                    .foreground
+                    .set_value_and_mark_modified(glyph.clone().into());
+            }
+        }
+
+        // Avalonia's RepeatButton steps while held; fyrox ships the machinery
+        // (0.1 s interval) but the numeric builder never enables it.
+        ctx.send_message(
+            fyrox::gui::message::UiMessage::for_widget(
+                button,
+                ButtonMessage::RepeatClicksOnHold(true),
+            )
+            .with_direction(fyrox::gui::message::MessageDirection::ToWidget),
+        );
     }
 }
 

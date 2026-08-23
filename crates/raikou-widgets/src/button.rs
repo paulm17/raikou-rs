@@ -6,11 +6,16 @@
 use std::rc::Rc;
 
 use fyrox::core::pool::Handle;
+use fyrox::graph::SceneGraph;
 use fyrox::gui::border::BorderBuilder;
 use fyrox::gui::brush::Brush;
 use fyrox::gui::button::{ButtonBuilder, ButtonMessage};
 use fyrox::gui::decorator::DecoratorBuilder;
-use fyrox::gui::message::{KeyCode, MouseButton, UiMessage};
+use fyrox::gui::dropdown_list::DropdownList;
+use fyrox::gui::list_view::ListView;
+use fyrox::gui::message::{KeyCode, MessageDirection, MouseButton, UiMessage};
+use fyrox::gui::text_box::TextBox;
+use fyrox::gui::tree::Tree;
 use fyrox::gui::widget::{WidgetBuilder, WidgetMessage};
 use fyrox::gui::{UiNode, UserInterface};
 
@@ -58,6 +63,16 @@ pub struct ButtonHandlers {
     pub click_mode: ClickMode,
     /// When `true` all interaction is suppressed (the button shows a spinner).
     pub loading: bool,
+    /// Handle of the button widget (used to skip messages aimed at itself).
+    pub(crate) handle: Handle<UiNode>,
+    /// Whether this is the window's default (Enter) button. When set, Enter
+    /// pressed anywhere outside an interactive control activates it — fyrox
+    /// only activates the *focused* button natively.
+    pub(crate) is_default: bool,
+    /// `true` for the registry-global clone that exists purely to provide
+    /// default-button wiring; it must never run click callbacks, or every
+    /// sibling button's Click would leak into it.
+    pub(crate) wiring_only: bool,
 }
 
 impl ButtonHandlers {
@@ -66,6 +81,18 @@ impl ButtonHandlers {
         if self.loading {
             return;
         }
+        if self.wiring_only {
+            self.run_default_wiring(ui, message);
+            return;
+        }
+
+        // Default-button wiring: Enter activates this button even when focus
+        // sits elsewhere (Avalonia `IsDefault`). Messages aimed at this very
+        // button fall through so the focused case fires exactly once via
+        // fyrox's native handling. Interactive destinations (other buttons,
+        // text boxes, lists...) keep their keys; Space never triggers the
+        // default button.
+        self.run_default_wiring(ui, message);
 
         if let Some(WidgetMessage::MouseEnter) = message.data::<WidgetMessage>() {
             if let Some(callback) = &self.on_mouse_over {
@@ -112,6 +139,24 @@ impl ButtonHandlers {
         }
     }
 
+    /// Default-button wiring shared by the exact-path and global handler
+    /// clones (see `wiring_only`).
+    fn run_default_wiring(&self, ui: &mut UserInterface, message: &UiMessage) {
+        if !self.is_default
+            || message.direction() != MessageDirection::ToWidget
+            || message.destination() == self.handle
+        {
+            return;
+        }
+        if let Some(WidgetMessage::KeyDown(key)) = message.data::<WidgetMessage>() {
+            if matches!(key, KeyCode::Enter | KeyCode::NumpadEnter)
+                && !destination_is_interactive(ui, message.destination())
+            {
+                self.fire_click(ui, message);
+            }
+        }
+    }
+
     fn fire_click(&self, ui: &mut UserInterface, message: &UiMessage) {
         if let Some(callback) = &self.on_click {
             let event = ClickEvent {
@@ -122,6 +167,31 @@ impl ButtonHandlers {
             callback(ui, &event);
         }
     }
+}
+
+/// Walks the ancestors of `destination` and reports whether focus effectively
+/// sits in a control that consumes Enter itself (buttons — including menu
+/// items — multi-line text boxes, dropdowns, trees and lists). Single-line
+/// text boxes do NOT consume Enter, matching Avalonia's default-button rule.
+fn destination_is_interactive(ui: &UserInterface, destination: Handle<UiNode>) -> bool {
+    let mut current = destination;
+    while current.is_some() {
+        let Ok(node) = ui.try_get_node(current) else {
+            break;
+        };
+        if node.cast::<fyrox::gui::button::Button>().is_some()
+            || node
+                .cast::<TextBox>()
+                .is_some_and(|text_box| *text_box.multiline)
+            || node.cast::<DropdownList>().is_some()
+            || node.cast::<Tree>().is_some()
+            || node.cast::<ListView>().is_some()
+        {
+            return true;
+        }
+        current = node.parent();
+    }
+    false
 }
 
 /// Builder for a [`crate::Button`] component.
@@ -369,10 +439,36 @@ impl Button {
                 on_mouse_out: self.on_mouse_out,
                 click_mode: self.click_mode,
                 loading: self.loading,
+                handle,
+                is_default: self.is_default,
+                wiring_only: false,
             }),
         };
         cx.register(&component);
+        if self.is_default {
+            // The default button must see Enter presses aimed anywhere in the
+            // window. The global clone is wiring-only (no click callbacks) so
+            // sibling clicks never leak into it; the pass skips messages
+            // aimed at this handle so the focused case fires exactly once.
+            let global = Component {
+                handle,
+                kind: ComponentKind::Button(ButtonHandlers {
+                    wiring_only: true,
+                    ..component_kind_handlers(&component)
+                }),
+            };
+            cx.register_global(&global);
+        }
         component
+    }
+}
+
+/// Clones a button component's handler payload (used for the wiring-only
+/// global registration).
+fn component_kind_handlers(component: &Component) -> ButtonHandlers {
+    match &component.kind {
+        ComponentKind::Button(handlers) => handlers.clone(),
+        _ => unreachable!("button component always carries Button handlers"),
     }
 }
 

@@ -4,7 +4,6 @@ mod common;
 
 use common::Harness;
 use fyrox::graph::SceneGraph;
-use fyrox::gui::text::TextMessage;
 use raikou_widgets::{set_label_text, BoxWidget, Group, Label, Stack};
 
 #[test]

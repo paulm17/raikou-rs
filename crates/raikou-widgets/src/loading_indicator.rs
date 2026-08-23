@@ -1,4 +1,4 @@
-//! The LoadingIndicator component — a self-animating spinner with nine modes.
+//! The LoadingIndicator component — a self-animating spinner with ten modes.
 //!
 //! Implemented as a custom fyrox [`Control`] that advances its animation in
 //! `update()` and emits immediate-mode geometry in `draw()`. Under
@@ -49,6 +49,10 @@ pub enum LoadingIndicatorMode {
     ThreeDots,
     /// Five waving bars.
     Wave,
+    /// Fluent-style indeterminate bar: an accent block sweeps across a
+    /// muted track. Give the indicator a width via `.width(...)`; the
+    /// bar thickness follows `stroke_width`.
+    Bar,
 }
 
 /// fyrox control that renders the spinner animation.
@@ -71,19 +75,13 @@ fyrox::gui::define_widget_deref!(LoadingIndicatorControl);
 
 impl LoadingIndicatorControl {
     fn commit_solid(&self, drawing_context: &mut DrawingContext) {
-        drawing_context.commit(
-            self.clip_bounds(),
-            Brush::Solid(self.color),
-            CommandTexture::None,
-            &self.material,
-            None,
-        );
+        self.commit_color(self.color, drawing_context);
     }
 
-    fn commit_white(&self, drawing_context: &mut DrawingContext) {
+    fn commit_color(&self, color: FyroxColor, drawing_context: &mut DrawingContext) {
         drawing_context.commit(
             self.clip_bounds(),
-            Brush::Solid(FyroxColor::WHITE),
+            Brush::Solid(color),
             CommandTexture::None,
             &self.material,
             None,
@@ -142,7 +140,7 @@ impl LoadingIndicatorControl {
                 24,
                 self.with_alpha(0.25 + 0.5 * local_t),
             );
-            self.commit_white(drawing_context);
+            self.commit_color(self.color, drawing_context);
         }
     }
 
@@ -180,7 +178,7 @@ impl LoadingIndicatorControl {
             24,
             self.with_alpha(0.4 + 0.6 * scale),
         );
-        self.commit_white(drawing_context);
+        self.commit_color(self.color, drawing_context);
     }
 
     fn draw_ring(&self, drawing_context: &mut DrawingContext, center: Vector2<f32>) {
@@ -201,7 +199,7 @@ impl LoadingIndicatorControl {
                 12,
                 self.with_alpha(0.3 + 0.7 * scale),
             );
-            self.commit_white(drawing_context);
+            self.commit_color(self.color, drawing_context);
         }
     }
 
@@ -215,7 +213,7 @@ impl LoadingIndicatorControl {
                 .abs();
             let y = center.y - bounce * (self.size / 5.0);
             drawing_context.push_circle_filled(Vector2::new(x, y), self.size / 9.0, 12, self.color);
-            self.commit_white(drawing_context);
+            self.commit_color(self.color, drawing_context);
         }
     }
 
@@ -233,6 +231,54 @@ impl LoadingIndicatorControl {
             drawing_context.push_rect_filled(&Rect::new(x, y, bar_width, height), None);
             self.commit_solid(drawing_context);
         }
+    }
+    /// Fluent-style indeterminate bar: a muted full-width track with an
+    /// accent block sweeping left-to-right on a two-second loop.
+    fn draw_bar(&self, drawing_context: &mut DrawingContext) {
+        let bounds = self.bounding_rect();
+        let w = bounds.w().max(1.0);
+        let bar_h = self.stroke_width.max(1.0);
+        let y = bounds.h() / 2.0 - bar_h / 2.0;
+
+        // Muted track (Fluent BaseLow is foreground at ~20% alpha).
+        drawing_context.push_rect_filled(&Rect::new(0.0, y, w, bar_h), None);
+        self.commit_color(self.with_alpha(0.2), drawing_context);
+
+        // Accent block; smoothstep easing gives it the Fluent feel of
+        // accelerating away from the left edge and decelerating out.
+        let block_w = (w * 0.4).clamp(16.0, 60.0);
+        let t = (self.animation_time % 2.0) / 2.0;
+        let eased = t * t * (3.0 - 2.0 * t);
+        let x = -block_w + eased * (w + block_w);
+        drawing_context.push_rounded_rect_filled(
+            &Rect::new(x, y, block_w, bar_h),
+            bar_h / 2.0,
+            8,
+        );
+        self.commit_solid(drawing_context);
+    }
+}
+
+/// Accessors used by tests and embedding components.
+impl LoadingIndicatorControl {
+    /// The current animation mode.
+    pub fn mode(&self) -> LoadingIndicatorMode {
+        self.mode
+    }
+
+    /// The resolved draw color (theme accent when the builder set none).
+    pub fn color(&self) -> FyroxColor {
+        self.color
+    }
+
+    /// Seconds of accumulated animation time.
+    pub fn animation_time(&self) -> f32 {
+        self.animation_time
+    }
+
+    /// Whether the animation clock is running.
+    pub fn is_active(&self) -> bool {
+        self.is_active
     }
 }
 
@@ -272,6 +318,7 @@ impl Control for LoadingIndicatorControl {
             LoadingIndicatorMode::Ring => self.draw_ring(drawing_context, center),
             LoadingIndicatorMode::ThreeDots => self.draw_three_dots(drawing_context, center),
             LoadingIndicatorMode::Wave => self.draw_wave(drawing_context, center),
+            LoadingIndicatorMode::Bar => self.draw_bar(drawing_context),
         }
     }
 }
@@ -289,7 +336,7 @@ impl Control for LoadingIndicatorControl {
 pub struct LoadingIndicator {
     id: String,
     mode: LoadingIndicatorMode,
-    color: Color,
+    color: Option<Color>,
     size: f32,
     stroke_width: f32,
     speed_ratio: f32,
@@ -308,11 +355,14 @@ impl Default for LoadingIndicator {
 
 impl LoadingIndicator {
     /// Creates a new loading indicator builder.
+    ///
+    /// The color defaults to the active theme's `accent.solid` token
+    /// (Fluent indicators are monochrome accent); `.color()` overrides it.
     pub fn new() -> Self {
         Self {
             id: String::new(),
             mode: LoadingIndicatorMode::Pulse,
-            color: Color::new(0.13, 0.39, 0.94, 1.0),
+            color: None,
             size: 24.0,
             stroke_width: 2.0,
             speed_ratio: 1.0,
@@ -338,7 +388,7 @@ impl LoadingIndicator {
 
     /// Sets the spinner color.
     pub fn color(mut self, color: impl Into<Color>) -> Self {
-        self.color = color.into();
+        self.color = Some(color.into());
         self
     }
 
@@ -419,6 +469,13 @@ impl LoadingIndicator {
         } else {
             &builder.id
         };
+        // Fluent indicators are monochrome accent: fall back to the theme's
+        // accent token when the builder did not pin an explicit color.
+        let color = builder.color.unwrap_or_else(|| {
+            cx.theme()
+                .color("accent.solid")
+                .unwrap_or(Color::new(0.13, 0.39, 0.94, 1.0))
+        });
         let control = LoadingIndicatorControl {
             widget: WidgetBuilder::new()
                 .with_name(name)
@@ -428,7 +485,7 @@ impl LoadingIndicator {
                 .with_margin(to_fyrox_thickness(builder.padding))
                 .build(&cx.ctx()),
             mode: builder.mode,
-            color: to_fyrox_color(builder.color),
+            color: to_fyrox_color(color),
             size: builder.size,
             stroke_width: builder.stroke_width,
             speed_ratio: builder.speed_ratio,

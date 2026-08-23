@@ -153,6 +153,10 @@ impl Combobox {
             builder.build(&mut ctx).to_base()
         };
 
+        // Fluent restyle: thin stroked foreground chevron instead of the
+        // stock filled accent triangle (shared with Select).
+        crate::select::fluent_dropdown_arrow(&mut cx.ctx(), &theme, inner);
+
         // Nothing selected: plant a muted placeholder text into the inner
         // dropdown's content grid; handlers flip its visibility with the
         // selection state.
@@ -215,10 +219,16 @@ impl Combobox {
         cx.register(&Component {
             handle: inner,
             kind: ComponentKind::Combobox(ComboboxHandlers {
-                on_change: self.on_change,
+                on_change: self.on_change.clone(),
                 command_target: inner,
                 placeholder,
             }),
+        });
+        // Shared with Select: global watcher for arrow-key cycling of the
+        // open flyout (focus lives inside the popup while it is open).
+        cx.register_global(&Component {
+            handle: inner,
+            kind: ComponentKind::SelectNav(crate::select::SelectNavHandlers { target: inner }),
         });
         component
     }

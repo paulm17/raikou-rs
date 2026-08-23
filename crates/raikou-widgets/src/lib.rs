@@ -36,8 +36,9 @@ pub mod text_area;
 pub mod text_input;
 pub mod theme_scope;
 pub mod tree;
+pub mod tween;
 
-pub use accordion::{Accordion, AccordionHandle};
+pub use accordion::{Accordion, AccordionHandle, AccordionItem};
 pub use box_widget::{BoxHandle, BoxWidget};
 pub use build_cx::BuildCx;
 pub use button::{Button, ButtonHandle, ClickMode};
@@ -66,4 +67,4 @@ pub use tabs::{Tabs, TabsHandle};
 pub use text_area::{TextArea, TextAreaHandle};
 pub use text_input::{TextInput, TextInputHandle};
 pub use theme_scope::{ThemeScope, ThemeScopeHandle};
-pub use tree::{Tree, TreeHandle, TreeNode};
+pub use tree::{Tree, TreeCommand, TreeHandle, TreeNode};

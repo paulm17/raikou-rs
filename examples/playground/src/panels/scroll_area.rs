@@ -53,6 +53,26 @@ pub fn scroll_area_panel(
         .content_max_size(420.0, 240.0)
         .build(&mut cx);
 
+    // RAIKOU_SCROLL_SHOW=1 reveals the overlay thumbs (they are hidden until
+    // hover/scroll by default) so captures can show the shown state.
+    if std::env::var("RAIKOU_SCROLL_SHOW").as_deref() == Ok("1") {
+        use fyrox::graph::SceneGraph;
+        use fyrox::gui::scroll_bar::ScrollBar;
+        let ui = cx.ui();
+        let mut stack = vec![Handle::<UiNode>::from(&preview)];
+        while let Some(handle) = stack.pop() {
+            if handle.is_none() {
+                continue;
+            }
+            if let Ok(bar) = ui.try_get_of_type::<ScrollBar>(handle) {
+                ui.send(*bar.indicator, WidgetMessage::Visibility(true));
+            }
+            for child in ui.node(handle).children().to_vec() {
+                stack.push(child);
+            }
+        }
+    }
+
     let notes = playground_notes(
         &mut cx,
         "ScrollArea playground",

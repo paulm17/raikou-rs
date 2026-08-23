@@ -86,8 +86,10 @@ fn build_code(state: &PlaygroundState) -> String {
     code.push_str(";\n");
     for item in &state.items {
         code.push_str(&format!(
-            "// section {:?} — accent: {} (expanded: {})\n",
-            item.label, ACCENTS[item.accent].0, item.expanded
+            ".push_item(AccordionItem {{ label: {:?}.into(), expanded: {}, content: Some(section), accent: Some({}) }})\n",
+            item.label,
+            item.expanded,
+            ACCENTS[item.accent].0.to_uppercase(),
         ));
     }
     code
@@ -147,11 +149,12 @@ pub fn accordion_panel(
     accordion = accordion.allow_multiple(defaults.allow_multiple);
     for (i, item) in defaults.items.iter().enumerate() {
         let section = sections[i];
-        accordion = if item.expanded {
-            accordion.item_with_content_expanded(&item.label, section)
-        } else {
-            accordion.item_with_content(&item.label, section)
-        };
+        accordion = accordion.push_item(AccordionItem {
+            label: item.label.clone(),
+            expanded: item.expanded,
+            content: Some(section),
+            accent: Some(ACCENTS[item.accent].1),
+        });
     }
     let state_toggle = Rc::clone(&state);
     accordion = accordion.on_toggle(move |_ui, index, expanded| {

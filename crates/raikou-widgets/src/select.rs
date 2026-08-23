@@ -2,10 +2,14 @@
 
 use std::rc::Rc;
 
+use fyrox::core::algebra::Vector2;
 use fyrox::core::pool::Handle;
 use fyrox::gui::brush::Brush;
 use fyrox::gui::dropdown_list::{DropdownList, DropdownListBuilder, DropdownListMessage};
-use fyrox::gui::message::{MessageDirection, UiMessage};
+use fyrox::gui::message::{KeyCode, MessageDirection, UiMessage};
+use fyrox::gui::list_view::{ListView, ListViewMessage};
+use fyrox::gui::popup::Popup;
+use fyrox::gui::vector_image::{Primitive, VectorImage};
 use fyrox::gui::widget::{WidgetBuilder, WidgetMessage};
 use fyrox::gui::{UiNode, UserInterface};
 
@@ -147,6 +151,10 @@ impl Select {
             builder.build(&mut ctx).to_base()
         };
 
+        // Fluent restyle: thin stroked foreground chevron instead of the
+        // stock filled accent triangle (Avalonia ComboBox glyph).
+        fluent_dropdown_arrow(&mut cx.ctx(), &theme, inner);
+
         // Nothing selected: plant a muted placeholder text into the inner
         // dropdown's content grid; handlers flip its visibility with the
         // selection state. An empty placeholder string means none.
@@ -175,6 +183,10 @@ impl Select {
                 )
                 .with_text(&self.placeholder)
                 .with_font(font)
+                // Glyph-level centering: keeps the placeholder vertically
+                // centered even when the field is stretched tall (the widget
+                // alone may be arranged at the top of its grid cell).
+                .with_vertical_text_alignment(fyrox::gui::VerticalAlignment::Center)
                 .build(&mut ctx)
                 .to_base();
                 ctx.link(text, grid);
@@ -209,14 +221,142 @@ impl Select {
         cx.register(&Component {
             handle: inner,
             kind: ComponentKind::Select(SelectHandlers {
-                on_change: self.on_change,
+                on_change: self.on_change.clone(),
                 command_target: inner,
                 placeholder,
             }),
+        });
+        // Arrow-key cycling of the open flyout needs a global watcher: with
+        // the popup open, focus lives inside it and presses never land on a
+        // registered handle.
+        cx.register_global(&Component {
+            handle: inner,
+            kind: ComponentKind::SelectNav(SelectNavHandlers { target: inner }),
         });
         component
     }
 }
 
+/// Swaps the stock filled triangle of a fyrox `DropdownList` for Fluent's
+/// thin stroked chevron glyph in the theme's secondary text color (the
+/// Avalonia ComboBox drop-down marker). Shared with the combobox component.
+pub(crate) fn fluent_dropdown_arrow(
+    ctx: &mut fyrox::gui::BuildContext,
+    theme: &raikou_style::Theme,
+    dropdown: Handle<UiNode>,
+) {
+    let main_grid = ctx[dropdown].cast::<DropdownList>().map(|dd| *dd.main_grid);
+    let Some(main_grid) = main_grid else {
+        return;
+    };
+
+    let fallback = raikou_core::Color::new(0.35, 0.35, 0.39, 1.0);
+    let color = to_fyrox_color(theme.color("text.secondary").unwrap_or(fallback));
+    let thickness = 1.5;
+    let chevron = vec![
+        Primitive::Line {
+            begin: Vector2::new(1.5, 1.75),
+            end: Vector2::new(5.0, 5.25),
+            thickness,
+        },
+        Primitive::Line {
+            begin: Vector2::new(5.0, 5.25),
+            end: Vector2::new(8.5, 1.75),
+            thickness,
+        },
+    ];
+
+    let children = match ctx.try_get_node(main_grid.to_base()) {
+        Ok(node) => node.children().to_vec(),
+        Err(_) => return,
+    };
+    for child in children {
+        if child.is_none() {
+            continue;
+        }
+        if let Some(arrow) = ctx[child].cast_mut::<VectorImage>() {
+            arrow
+                .primitives
+                .set_value_and_mark_modified(chevron.clone());
+            arrow.widget.set_width(10.0);
+            arrow.widget.set_height(7.0);
+            arrow
+                .widget
+                .foreground
+                .set_value_and_mark_modified(Brush::Solid(color).into());
+        }
+    }
+}
+
 /// A handle to a built select.
 pub type SelectHandle = Handle<UiNode>;
+
+/// Global key watcher that cycles an open dropdown list with the arrow keys.
+///
+/// When the flyout is open, fyrox moves keyboard focus into the popup's list,
+/// so arrow presses are aimed at nodes the exact-path registry never sees.
+/// The watcher only reacts while its own dropdown's flyout is open and the
+/// press landed inside that flyout; `close_on_selection` stays off in raikou
+/// builds, so cycling commits the highlighted item without dismissing it
+/// (Avalonia highlights first and commits on Enter — a documented deviation).
+#[derive(Clone)]
+pub struct SelectNavHandlers {
+    /// The inner `DropdownList` this watcher serves.
+    pub(crate) target: Handle<UiNode>,
+}
+
+impl SelectNavHandlers {
+    pub fn dispatch(&self, ui: &mut UserInterface, message: &UiMessage) {
+        use fyrox::graph::SceneGraph;
+
+        if message.direction() != MessageDirection::ToWidget {
+            return;
+        }
+        let Some(&WidgetMessage::KeyDown(key)) = message.data::<WidgetMessage>() else {
+            return;
+        };
+        if !matches!(key, KeyCode::ArrowDown | KeyCode::ArrowUp) {
+            return;
+        }
+        let (popup, list_view, count, current) = {
+            let Ok(dd) = ui.try_get_of_type::<DropdownList>(self.target) else {
+                return;
+            };
+            let popup: Handle<UiNode> = (*dd.popup).to_base();
+            let list_view: Handle<UiNode> = (*dd.list_view).to_base();
+            let Ok(list) = ui.try_get_of_type::<ListView>(list_view) else {
+                return;
+            };
+            (
+                popup,
+                list_view,
+                (*list.items).len(),
+                list.selection.first().copied(),
+            )
+        };
+        let Ok(p) = ui.try_get_of_type::<Popup>(popup) else {
+            return;
+        };
+        if !*p.is_open {
+            return;
+        }
+        if !crate::component::is_in_subtree(ui, message.destination(), popup) {
+            return;
+        }
+        if count == 0 {
+            return;
+        }
+        let next = match (key, current) {
+            (KeyCode::ArrowDown, Some(i)) => (i + 1).min(count - 1),
+            (KeyCode::ArrowDown, None) => 0,
+            (KeyCode::ArrowUp, Some(i)) => i.saturating_sub(1),
+            (KeyCode::ArrowUp, None) => count - 1,
+            _ => return,
+        };
+        // Commit through the list view only: fyrox mirrors the change back
+        // as a FromWidget `DropdownListMessage::Selection`, and the exact-path
+        // `SelectHandlers` already reports that (firing here too would count
+        // every cycle twice).
+        ui.send(list_view, ListViewMessage::Selection(vec![next]));
+    }
+}

@@ -3,7 +3,6 @@
 //! queue through the [`ComponentRegistry`] exactly like the app loop does.
 
 use fyrox::core::algebra::Vector2;
-use fyrox::graph::SceneGraph;
 use fyrox::gui::UiUpdateSwitches;
 use fyrox::gui::UserInterface;
 use raikou_style::Theme;
@@ -16,6 +15,7 @@ pub struct Harness {
     pub registry: ComponentRegistry,
 }
 
+#[allow(dead_code)]
 impl Harness {
     pub fn new() -> Self {
         Self::new_with_theme(Theme::fluent_light(), false)
@@ -74,10 +74,13 @@ impl Harness {
     }
 }
 
-/// Counts callback invocations.
+/// Counts callback invocations. Some test binaries never construct it, but
+/// the shared module is compiled per-binary, hence the allow.
+#[allow(dead_code)]
 #[derive(Clone, Default)]
 pub struct Counter(Rc<std::cell::Cell<usize>>);
 
+#[allow(dead_code)]
 impl Counter {
     pub fn new() -> Self {
         Self::default()

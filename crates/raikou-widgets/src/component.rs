@@ -17,12 +17,13 @@ use crate::menu::MenuBarHandlers;
 use crate::radio::{RadioGroupHandlers, RadioGroupItemHandlers, RadioHandlers};
 use crate::scroll_area::ScrollAreaHandlers;
 use crate::select::SelectHandlers;
-use crate::slider::SliderHandlers;
+use crate::slider::{SliderHandlers, SliderJump, SliderNav};
 use crate::step_input::StepInputHandlers;
 use crate::switch::SwitchHandlers;
-use crate::tabs::TabsHandlers;
+use crate::select::SelectNavHandlers;
+use crate::tabs::{TabsHandlers, TabsNavHandlers};
 use crate::text_area::TextAreaHandlers;
-use crate::text_input::TextInputHandlers;
+use crate::text_input::{FocusRingHandlers, TextInputHandlers, WordSelectHandlers};
 use crate::tree::TreeHandlers;
 
 /// Payload of a click event delivered to an `on_click` callback.
@@ -54,18 +55,41 @@ pub enum ComponentKind {
     RadioGroupItem(RadioGroupItemHandlers),
     /// Handlers for a [`crate::Slider`] component.
     Slider(SliderHandlers),
+    /// Global watcher jumping a slider to a clicked track position.
+    SliderJump(SliderJump),
+    /// Global key watcher giving sliders arrow/Home/End navigation.
+    SliderNav(SliderNav),
     /// Handlers for a [`crate::TextInput`] component.
     TextInput(TextInputHandlers),
+    /// Global focus watcher that accents a text field's chrome while any node
+    /// of its subtree holds keyboard focus (see [`crate::TextInput`]).
+    FocusRing(FocusRingHandlers),
+    /// Global double-click watcher that selects the word under the caret of a
+    /// text box (presses are aimed at whatever child sits under the cursor).
+    WordSelect(WordSelectHandlers),
+    /// Global key watcher that cycles an open dropdown's list with the arrow
+    /// keys (focus sits inside the flyout, so exact-path dispatch misses it).
+    SelectNav(SelectNavHandlers),
+    /// Global key watcher that switches tabs with Left/Right (fyrox's
+    /// TabControl has no keyboard handling of its own).
+    TabsNav(TabsNavHandlers),
     /// Handlers for a [`crate::TextArea`] component.
     TextArea(TextAreaHandlers),
     /// Handlers for a [`crate::StepInput`] component.
     StepInput(StepInputHandlers),
     /// Handlers for one item within an [`crate::Accordion`].
     AccordionItem(AccordionItemHandlers),
+    /// Global watcher making a whole [`crate::Accordion`] header a click
+    /// target (mouse-ups land on whatever deep child sits under the cursor).
+    AccordionHeaderHit(crate::accordion::AccordionHeaderHit),
     /// Handlers for a [`crate::Tabs`] component.
     Tabs(TabsHandlers),
     /// Handlers for a [`crate::ScrollArea`] component.
     ScrollArea(ScrollAreaHandlers),
+    /// Overlay-thumb auto-hide helpers registered on every node of a
+    /// [`crate::ScrollArea`] subtree (enter/leave are aimed at the exact
+    /// widget under the cursor, so every descendant needs a registration).
+    ScrollAreaAutoHide(crate::scroll_area::ScrollAutoHideHandlers),
     /// Handlers for a [`crate::MenuBar`] component.
     MenuBar(MenuBarHandlers),
     /// Handlers for a [`crate::ContextMenu`] component.
@@ -93,12 +117,20 @@ impl ComponentKind {
             ComponentKind::RadioGroup(handlers) => handlers.dispatch(ui, message),
             ComponentKind::RadioGroupItem(handlers) => handlers.dispatch(ui, message),
             ComponentKind::Slider(handlers) => handlers.dispatch(ui, message),
+            ComponentKind::SliderJump(handlers) => handlers.dispatch(ui, message),
+            ComponentKind::SliderNav(handlers) => handlers.dispatch(ui, message),
             ComponentKind::TextInput(handlers) => handlers.dispatch(ui, message),
+            ComponentKind::FocusRing(handlers) => handlers.dispatch(ui, message),
+            ComponentKind::WordSelect(handlers) => handlers.dispatch(ui, message),
+            ComponentKind::SelectNav(handlers) => handlers.dispatch(ui, message),
+            ComponentKind::TabsNav(handlers) => handlers.dispatch(ui, message),
             ComponentKind::TextArea(handlers) => handlers.dispatch(ui, message),
             ComponentKind::StepInput(handlers) => handlers.dispatch(ui, message),
             ComponentKind::AccordionItem(handlers) => handlers.dispatch(ui, message),
+            ComponentKind::AccordionHeaderHit(handlers) => handlers.dispatch(ui, message),
             ComponentKind::Tabs(handlers) => handlers.dispatch(ui, message),
             ComponentKind::ScrollArea(handlers) => handlers.dispatch(ui, message),
+            ComponentKind::ScrollAreaAutoHide(handlers) => handlers.dispatch(ui, message),
             ComponentKind::MenuBar(handlers) => handlers.dispatch(ui, message),
             ComponentKind::ContextMenu(handlers) => handlers.dispatch(ui, message),
             ComponentKind::Select(handlers) => handlers.dispatch(ui, message),
@@ -156,4 +188,27 @@ impl From<&Component> for Handle<UiNode> {
     fn from(component: &Component) -> Self {
         component.handle
     }
+}
+
+/// Walks the ancestors of `start` (inclusive) and reports whether `target`
+/// is among them. Global watchers use this to attribute messages aimed at
+/// whatever deep child the pointer or focus landed on.
+pub(crate) fn is_in_subtree(
+    ui: &UserInterface,
+    start: Handle<UiNode>,
+    target: Handle<UiNode>,
+) -> bool {
+    use fyrox::graph::SceneGraph;
+
+    let mut current = start;
+    while current.is_some() {
+        if current == target {
+            return true;
+        }
+        let Ok(node) = ui.try_get_node(current) else {
+            break;
+        };
+        current = node.parent();
+    }
+    false
 }

@@ -7,7 +7,7 @@
 
 use super::{Theme, ThemeVariant};
 use crate::property::{box_style, layout, text_style};
-use crate::recipe::RecipeKey;
+use crate::recipe::{CompoundVariantCondition, RecipeKey};
 use crate::state::WidgetState;
 use crate::style::StylePrecedence;
 use raikou_core::Color;
@@ -229,6 +229,34 @@ fn button_recipe(b: &mut super::ComponentRecipeBuilder, dark: bool) {
             crate::style::StyleSource::Variant,
         );
     });
+    // Avalonia Fluent standard button: BaseLow fill (fg @ 20%), transparent
+    // 1px border (ButtonBorderBrush), BaseHigh label.
+    b.variant("appearance", "default", |s| {
+        s.set_color(
+            box_style::BACKGROUND,
+            bg_normal,
+            StylePrecedence::Variant,
+            crate::style::StyleSource::Variant,
+        );
+        s.set_color(
+            box_style::BORDER_COLOR,
+            Color::TRANSPARENT,
+            StylePrecedence::Variant,
+            crate::style::StyleSource::Variant,
+        );
+        s.set_f32(
+            box_style::BORDER_WIDTH,
+            1.0,
+            StylePrecedence::Variant,
+            crate::style::StyleSource::Variant,
+        );
+        s.set_color(
+            text_style::COLOR,
+            fg,
+            StylePrecedence::Variant,
+            crate::style::StyleSource::Variant,
+        );
+    });
     b.variant("appearance", "outline", |s| {
         s.set_color(
             box_style::BACKGROUND,
@@ -377,6 +405,38 @@ fn button_recipe(b: &mut super::ComponentRecipeBuilder, dark: bool) {
             crate::style::StyleSource::State,
         );
     });
+    // Standard-button states (Avalonia `ButtonBackgroundPointerOver` =
+    // BaseHigh @ 10%, `ButtonBackgroundPressed` = BaseMediumLow = fg @ 40%;
+    // border brushes stay transparent). Compounds refine the shared accent
+    // hover/pressed styles above for this variant only.
+    b.compound(
+        vec![
+            CompoundVariantCondition::variant("appearance", "default"),
+            CompoundVariantCondition::hovered(),
+        ],
+        |s| {
+            s.set_color(
+                box_style::BACKGROUND,
+                Color::new(fg.red, fg.green, fg.blue, 0.1),
+                StylePrecedence::StateStyle,
+                crate::style::StyleSource::Variant,
+            );
+        },
+    );
+    b.compound(
+        vec![
+            CompoundVariantCondition::variant("appearance", "default"),
+            CompoundVariantCondition::pressed(),
+        ],
+        |s| {
+            s.set_color(
+                box_style::BACKGROUND,
+                Color::new(fg.red, fg.green, fg.blue, 0.4),
+                StylePrecedence::StateStyle,
+                crate::style::StyleSource::Variant,
+            );
+        },
+    );
 }
 
 /// The Avalonia Fluent light theme ("Default" dictionary).

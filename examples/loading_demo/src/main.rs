@@ -47,6 +47,7 @@ fn build_demo_panel(
         ("Arc", LoadingIndicatorMode::Arc),
         ("Arcs", LoadingIndicatorMode::Arcs),
         ("ArcsRing", LoadingIndicatorMode::ArcsRing),
+        ("Bar", LoadingIndicatorMode::Bar),
         ("DoubleBounce", LoadingIndicatorMode::DoubleBounce),
         ("FlipPlane", LoadingIndicatorMode::FlipPlane),
         ("Pulse", LoadingIndicatorMode::Pulse),

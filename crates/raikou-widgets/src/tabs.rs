@@ -11,8 +11,8 @@
 use std::rc::Rc;
 
 use fyrox::core::pool::Handle;
-use fyrox::gui::message::{MessageDirection, UiMessage};
-use fyrox::gui::tab_control::{TabControlBuilder, TabControlMessage, TabDefinition};
+use fyrox::gui::message::{KeyCode, MessageDirection, UiMessage};
+use fyrox::gui::tab_control::{TabControl, TabControlBuilder, TabControlMessage, TabDefinition};
 use fyrox::gui::text::TextBuilder;
 use fyrox::gui::widget::{WidgetBuilder, WidgetMessage};
 use fyrox::gui::{UiNode, UserInterface};
@@ -281,17 +281,110 @@ impl Tabs {
             }
         }
 
+        let uuids = Rc::new(uuids);
         let component = Component {
             handle,
             kind: ComponentKind::Tabs(TabsHandlers {
-                uuids,
+                uuids: (*uuids).clone(),
                 underlines,
                 on_change: self.on_change,
             }),
         };
         cx.register(&component);
+        // Arrow-key tab switching runs as a global watcher: presses land on
+        // whatever header/content node holds focus, never on this handle.
+        cx.register_global(&Component {
+            handle,
+            kind: ComponentKind::TabsNav(TabsNavHandlers {
+                target: handle,
+                uuids,
+            }),
+        });
         component
     }
+}
+
+/// Global key watcher that switches tabs with Left/Right.
+///
+/// fyrox's TabControl has no keyboard handling, and presses land on whatever
+/// header/content node holds focus, so this runs as a registry-global watcher
+/// gated on the press originating inside its own tab control. Left/Right wrap
+/// around; Home/End are not handled (Avalonia moves focus rather than
+/// selection — the direct-switch model is a documented simplification).
+#[derive(Clone)]
+pub struct TabsNavHandlers {
+    /// The `TabControl` this watcher serves.
+    pub(crate) target: Handle<UiNode>,
+    /// Tab UUIDs in build order (mirrors [`TabsHandlers::uuids`]).
+    pub(crate) uuids: Rc<Vec<Uuid>>,
+}
+
+impl TabsNavHandlers {
+    pub fn dispatch(&self, ui: &mut UserInterface, message: &UiMessage) {
+        use fyrox::graph::SceneGraph;
+
+        if message.direction() != MessageDirection::ToWidget {
+            return;
+        }
+        let Some(&WidgetMessage::KeyDown(key)) = message.data::<WidgetMessage>() else {
+            return;
+        };
+        let delta: i32 = match key {
+            KeyCode::ArrowLeft => -1,
+            KeyCode::ArrowRight => 1,
+            _ => return,
+        };
+        if !crate::component::is_in_subtree(ui, message.destination(), self.target) {
+            return;
+        }
+        if in_text_entry(ui, message.destination()) {
+            return;
+        }
+        let len = self.uuids.len();
+        if len == 0 {
+            return;
+        }
+        let active = ui
+            .try_get_of_type::<TabControl>(self.target)
+            .ok()
+            .and_then(|tc| tc.active_tab);
+        let next = match active {
+            Some(i) => ((i as i32) + delta).rem_euclid(len as i32) as usize,
+            None if delta > 0 => 0,
+            None => len - 1,
+        };
+        ui.send(
+            self.target,
+            TabControlMessage::ActiveTab(Some(self.uuids[next])),
+        );
+    }
+}
+
+/// Whether an ancestor of `start` is a text-entry or list-like widget whose
+/// own arrow-key handling must win over tab switching. Deliberately excludes
+/// plain buttons (tab headers) so arrows work while a header holds focus.
+pub(crate) fn in_text_entry(ui: &UserInterface, start: Handle<UiNode>) -> bool {
+    use fyrox::graph::SceneGraph;
+
+    use fyrox::gui::dropdown_list::DropdownList;
+    use fyrox::gui::list_view::ListView;
+    use fyrox::gui::text_box::TextBox;
+
+    let mut current = start;
+    while !current.is_none() {
+        let Ok(node) = ui.try_get_node(current) else {
+            break;
+        };
+        let interactive = node.cast::<TextBox>().is_some()
+            || node.cast::<DropdownList>().is_some()
+            || node.cast::<ListView>().is_some()
+            || node.cast::<fyrox::gui::tree::Tree>().is_some();
+        if interactive {
+            return true;
+        }
+        current = node.parent();
+    }
+    false
 }
 
 /// Finds the first Text node under `root` (the header label).

@@ -10,7 +10,7 @@ use std::rc::Rc;
 use fyrox::core::pool::Handle;
 use fyrox::gui::message::{MessageDirection, UiMessage};
 use fyrox::gui::scroll_viewer::{ScrollViewerBuilder, ScrollViewerMessage};
-use fyrox::gui::widget::WidgetBuilder;
+use fyrox::gui::widget::{WidgetBuilder, WidgetMessage};
 use fyrox::gui::{UiNode, UserInterface};
 
 use raikou_core::{Length, Thickness};
@@ -20,6 +20,50 @@ use crate::component::{Component, ComponentKind};
 use crate::convert::to_fyrox_thickness;
 
 type ScrollCallback = dyn Fn(&mut UserInterface, f32, f32);
+
+/// Overlay-thumb auto-hide helpers of a [`ScrollArea`].
+///
+/// Fluent overlay scrollbars only show their thumbs while the pointer is
+/// over the area or while it is being scrolled. fyrox posts `MouseEnter` /
+/// `MouseLeave` to the exact widget under the cursor, so one instance of
+/// these handlers is registered on every node of the area's subtree.
+#[derive(Clone)]
+pub struct ScrollAutoHideHandlers {
+    indicators: Vec<Handle<UiNode>>,
+}
+
+impl ScrollAutoHideHandlers {
+    fn set_visible(&self, ui: &mut UserInterface, visible: bool) {
+        for indicator in &self.indicators {
+            ui.send(*indicator, WidgetMessage::Visibility(visible));
+        }
+    }
+
+    /// Routes a UI message to the auto-hide state machine.
+    pub fn dispatch(&self, ui: &mut UserInterface, message: &UiMessage) {
+        if let Some(WidgetMessage::MouseEnter) = message.data::<WidgetMessage>() {
+            self.set_visible(ui, true);
+            return;
+        }
+        if let Some(WidgetMessage::MouseLeave) = message.data::<WidgetMessage>() {
+            self.set_visible(ui, false);
+            return;
+        }
+        // Wheel scrolling keeps the thumbs visible even without pointer
+        // movement (no enter/leave fires in that case).
+        if message.direction() == MessageDirection::FromWidget {
+            if let Some(msg) = message.data::<ScrollViewerMessage>() {
+                if matches!(
+                    msg,
+                    ScrollViewerMessage::VerticalScroll(_) | ScrollViewerMessage::HorizontalScroll(_)
+                ) {
+                    self.set_visible(ui, true);
+                }
+            }
+        }
+    }
+}
+
 /// Handlers of a ScrollArea component.
 #[derive(Clone)]
 pub struct ScrollAreaHandlers {
@@ -29,11 +73,19 @@ pub struct ScrollAreaHandlers {
     pub h_offset: Cell<f32>,
     /// Invoked with `(vertical, horizontal)` offsets on scroll.
     pub on_scroll: Option<Rc<ScrollCallback>>,
+    /// Overlay-thumb auto-hide helpers. Kept here (besides the per-descendant
+    /// registrations) because the viewer itself is the destination of its own
+    /// scroll/enter/leave messages and the registry stores one kind per
+    /// handle.
+    pub(crate) auto_hide: Option<ScrollAutoHideHandlers>,
 }
 
 impl ScrollAreaHandlers {
     /// Routes a UI message to the matching handler.
     pub fn dispatch(&self, ui: &mut UserInterface, message: &UiMessage) {
+        if let Some(auto_hide) = &self.auto_hide {
+            auto_hide.dispatch(ui, message);
+        }
         if message.direction() != MessageDirection::FromWidget {
             return;
         }
@@ -180,6 +232,7 @@ impl ScrollArea {
         // rounded thumb (4px cross-axis) and make the track invisible so only
         // the thumb floats over content. Applied to both axes when present.
         // fyrox keeps enforcing its minimum thumb size internally.
+        let auto_hide;
         {
             use crate::convert::to_fyrox_color;
             use fyrox::graph::SceneGraph;
@@ -195,9 +248,14 @@ impl ScrollArea {
 
             let theme = cx.theme().clone();
             let token = |name: &str, fallback: RaikouColor| theme.color(name).unwrap_or(fallback);
-            let normal_fill = token("text.secondary", RaikouColor::new(0.35, 0.35, 0.39, 1.0));
-            let hover_fill = token("text.primary", RaikouColor::new(0.10, 0.10, 0.10, 1.0));
-            let pressed_fill = token("accent.solid", RaikouColor::new(0.0, 0.47, 0.84, 1.0));
+            // Fluent overlay thumbs are translucent tints of the foreground
+            // (Avalonia maps the thumb fills onto the BaseMediumLow/Medium
+            // alpha ramps: ~40% idle, ~60% pointer-over/pressed).
+            let base = token("text.primary", RaikouColor::new(0.10, 0.10, 0.10, 1.0));
+            let normal_fill = RaikouColor::new(base.red, base.green, base.blue, base.alpha * 0.4);
+            let hover_fill = RaikouColor::new(base.red, base.green, base.blue, base.alpha * 0.6);
+            let pressed_fill = hover_fill;
+            let mut indicators = Vec::new();
 
             // Find both ScrollBars (vertical + horizontal) under the viewer.
             let bars: Vec<Handle<UiNode>> = {
@@ -236,6 +294,7 @@ impl ScrollArea {
                         Err(_) => continue,
                     }
                 };
+                indicators.push(indicator);
                 let ui = cx.ui();
 
                 ui.send(increase, WidgetMessage::Visibility(false));
@@ -289,6 +348,41 @@ impl ScrollArea {
                     }
                 }
             }
+
+            // Auto-hide wiring: register the enter/leave handlers on every
+            // descendant so hover anywhere over the area shows the thumbs.
+            // The viewer itself keeps its own ScrollArea registration (the
+            // registry stores one kind per handle), and its handlers embed
+            // the same auto-hide helpers below.
+            auto_hide = ScrollAutoHideHandlers { indicators };
+            let subtree: Vec<Handle<UiNode>> = {
+                let ui = cx.ui();
+                let mut stack = vec![handle];
+                let mut seen = vec![handle];
+                while let Some(h) = stack.pop() {
+                    if h.is_none() {
+                        continue;
+                    }
+                    for child in ui.node(h).children().to_vec() {
+                        if !child.is_none() && !seen.contains(&child) {
+                            seen.push(child);
+                            stack.push(child);
+                        }
+                    }
+                }
+                seen
+            };
+            // Fluent overlay thumbs stay hidden until hover or scrolling.
+            {
+                let ui = cx.ui();
+                auto_hide.set_visible(ui, false);
+            }
+            for h in subtree.into_iter().filter(|h| *h != handle) {
+                cx.register(&Component {
+                    handle: h,
+                    kind: ComponentKind::ScrollAreaAutoHide(auto_hide.clone()),
+                });
+            }
         }
 
         let component = Component {
@@ -297,6 +391,7 @@ impl ScrollArea {
                 v_offset: Cell::new(0.0),
                 h_offset: Cell::new(0.0),
                 on_scroll: self.on_scroll,
+                auto_hide: Some(auto_hide),
             }),
         };
         cx.register(&component);

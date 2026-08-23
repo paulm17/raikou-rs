@@ -176,3 +176,131 @@ fn button_disabled_state_applies() {
         "widget must report enabled after set_enabled(true)"
     );
 }
+
+#[test]
+fn button_default_fires_on_enter_when_unfocused() {
+    let mut h = Harness::new();
+    let defaults = Counter::new();
+    let others = Counter::new();
+    let (d, o) = (defaults.clone(), others.clone());
+    let default_btn = h.build(move |cx| {
+        Button::new()
+            .text("OK")
+            .is_default(true)
+            .on_click(move |_, _| d.bump())
+            .build(cx)
+    });
+    let _other = h.build(move |cx| {
+        Button::new()
+            .text("Nope")
+            .on_click(move |_, _| o.bump())
+            .build(cx)
+    });
+
+    // Enter aimed at the root canvas (nothing focused): the default button
+    // must activate.
+    let root = h.ui.root();
+    h.ui.send(root, WidgetMessage::KeyDown(KeyCode::Enter));
+    h.pump();
+    assert_eq!(defaults.get(), 1, "Enter must activate the default button");
+    assert_eq!(others.get(), 0, "sibling buttons must stay idle");
+    let _ = default_btn;
+
+    // NumpadEnter behaves identically.
+    h.ui.send(root, WidgetMessage::KeyDown(KeyCode::NumpadEnter));
+    h.pump();
+    assert_eq!(defaults.get(), 2, "NumpadEnter must activate default too");
+
+    // Space never triggers the default action (Avalonia parity).
+    h.ui.send(root, WidgetMessage::KeyDown(KeyCode::Space));
+    h.pump();
+    assert_eq!(defaults.get(), 2, "Space must not trigger the default");
+}
+
+#[test]
+fn button_enter_on_focused_button_does_not_double_fire_default() {
+    let mut h = Harness::new();
+    let defaults = Counter::new();
+    let others = Counter::new();
+    let (d, o) = (defaults.clone(), others.clone());
+    let _default_btn = h.build(move |cx| {
+        Button::new()
+            .text("OK")
+            .is_default(true)
+            .on_click(move |_, _| d.bump())
+            .build(cx)
+    });
+    let other = h.build(move |cx| {
+        Button::new()
+            .text("Cancel")
+            .on_click(move |_, _| o.bump())
+            .build(cx)
+    });
+
+    // Enter aimed AT another button (real focus lands on the inner fyrox
+    // Button, not raikou's chrome wrapper): the native focused-button
+    // activation fires that button; the default must stay silent.
+    fn find_inner_button(ui: &fyrox::gui::UserInterface, root: fyrox::core::pool::Handle<fyrox::gui::UiNode>) -> fyrox::core::pool::Handle<fyrox::gui::UiNode> {
+        if ui.try_get_of_type::<fyrox::gui::button::Button>(root).is_ok() {
+            return root;
+        }
+        for child in ui.node(root).children() {
+            let found = find_inner_button(ui, *child);
+            if found.is_some() {
+                return found;
+            }
+        }
+        fyrox::core::pool::Handle::NONE
+    }
+
+    h.update_and_pump();
+    let inner_other = find_inner_button(&h.ui, other.handle);
+    assert!(inner_other.is_some(), "chrome must wrap an inner Button");
+    let before = others.get();
+    h.ui.send(inner_other, WidgetMessage::KeyDown(KeyCode::Enter));
+    h.pump();
+    assert_eq!(
+        others.get(),
+        before + 1,
+        "focused sibling must fire exactly once"
+    );
+    assert_eq!(defaults.get(), 0, "default must not double-fire");
+}
+
+#[test]
+fn button_default_ignores_enter_in_text_fields() {
+    use fyrox::gui::text_box::TextBox;
+    use raikou_widgets::{TextArea, TextInput};
+
+    let mut h = Harness::new();
+    let defaults = Counter::new();
+    let d = defaults.clone();
+    let _default_btn = h.build(move |cx| {
+        Button::new()
+            .text("OK")
+            .is_default(true)
+            .on_click(move |_, _| d.bump())
+            .build(cx)
+    });
+
+    // Multiline text area: Enter types a newline, must not submit dialogs.
+    let area = h.build(|cx| TextArea::new().rows(3).build(cx));
+    let inner_area = h.ui.node(area.handle).children()[0];
+    assert!(
+        h.ui
+            .try_get_of_type::<TextBox>(inner_area)
+            .map(|tb| *tb.multiline)
+            .unwrap_or(false),
+        "area inner must be a multiline TextBox"
+    );
+    h.ui.send(inner_area, WidgetMessage::KeyDown(KeyCode::Enter));
+    h.pump();
+    assert_eq!(defaults.get(), 0, "multiline Enter must not fire default");
+
+    // Single-line input: Enter SHOULD activate the default (commit semantics).
+    let input = h.build(|cx| TextInput::new().build(cx));
+    let inner_input = h.ui.node(input.handle).children()[0];
+    h.ui.send(inner_input, WidgetMessage::KeyDown(KeyCode::Enter));
+    h.pump();
+    assert_eq!(defaults.get(), 1, "single-line Enter should commit");
+}

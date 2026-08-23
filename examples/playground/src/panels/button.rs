@@ -24,7 +24,19 @@ const COLORS: &[(&str, Color)] = &[
     ("Slate", Color::new(0.36, 0.42, 0.50, 1.0)),
 ];
 
-const VARIANTS: [&str; 5] = ["Filled", "Outline", "Ghost", "Subtle", "Link"];
+const VARIANTS: [&str; 6] = ["Filled", "Outline", "Ghost", "Subtle", "Link", "Default"];
+
+fn variant_from_index(index: usize) -> ButtonVariant {
+    match index {
+        0 => ButtonVariant::Filled,
+        1 => ButtonVariant::Outline,
+        2 => ButtonVariant::Ghost,
+        3 => ButtonVariant::Subtle,
+        4 => ButtonVariant::Link,
+        5 => ButtonVariant::Default,
+        _ => ButtonVariant::Filled,
+    }
+}
 
 /// Shared demo state mutated by the control handlers.
 #[derive(Clone, Debug, PartialEq)]
@@ -133,25 +145,19 @@ pub fn button_panel(
 
     // --- preview content ---------------------------------------------------
     let defaults = PlaygroundState::default();
-    // RAIKOU_BUTTON_VARIANT=outline: capture a bare Fluent-style default-ish
-    // button (Outline, no playground width/radius overrides) for the audit.
-    let audit_outline = std::env::var("RAIKOU_BUTTON_VARIANT").as_deref() == Ok("outline");
-    let preview_variant = if audit_outline {
-        ButtonVariant::Outline
-    } else {
-        match defaults.variant {
-            0 => ButtonVariant::Filled,
-            1 => ButtonVariant::Outline,
-            2 => ButtonVariant::Ghost,
-            3 => ButtonVariant::Subtle,
-            _ => ButtonVariant::Link,
-        }
+    // RAIKOU_BUTTON_VARIANT=outline|default: capture a bare Fluent-style
+    // button (no playground width/radius overrides) for the audit.
+    let audit_variant = match std::env::var("RAIKOU_BUTTON_VARIANT").as_deref() {
+        Ok("outline") => Some(ButtonVariant::Outline),
+        Ok("default") => Some(ButtonVariant::Default),
+        _ => None,
     };
+    let preview_variant = audit_variant.unwrap_or_else(|| variant_from_index(defaults.variant));
     let mut preview_button = Button::new()
         .text(&defaults.label)
         .variant(preview_variant)
         .size(control_size(defaults.size));
-    if !audit_outline {
+    if audit_variant.is_none() {
         preview_button = preview_button
             .width(Length::Fixed(defaults.width))
             .corner_radius(defaults.radius);

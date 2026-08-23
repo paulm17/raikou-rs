@@ -2,7 +2,7 @@
 
 mod common;
 
-use common::{Counter, Harness};
+use common::Harness;
 use fyrox::gui::button::ButtonMessage;
 use fyrox::gui::tab_control::TabControlMessage;
 use raikou_widgets::Tabs;
@@ -82,4 +82,35 @@ fn collect_buttons(
         }
     }
     out
+}
+
+#[test]
+fn tabs_arrow_keys_switch_tabs() {
+    use fyrox::gui::message::KeyCode;
+    use fyrox::gui::widget::WidgetMessage;
+
+    let mut h = Harness::new();
+    let seen = std::rc::Rc::new(std::cell::Cell::new(usize::MAX));
+    let s = seen.clone();
+    let tabs = h.build(move |cx| {
+        let mut t = Tabs::new().on_change(move |_, i| s.set(i));
+        for label in ["One", "Two", "Three"] {
+            t = t.tab(label, Default::default());
+        }
+        t.build(cx)
+    });
+
+    // Left/Right switch the active tab with wraparound; fyrox's TabControl
+    // has no keyboard handling, so this is driven by the raikou watcher.
+    h.ui.send(tabs.handle, WidgetMessage::KeyDown(KeyCode::ArrowRight));
+    h.pump();
+    assert_eq!(seen.get(), 1, "ArrowRight activates the next tab");
+
+    h.ui.send(tabs.handle, WidgetMessage::KeyDown(KeyCode::ArrowLeft));
+    h.pump();
+    assert_eq!(seen.get(), 0, "ArrowLeft returns to the first tab");
+
+    h.ui.send(tabs.handle, WidgetMessage::KeyDown(KeyCode::ArrowLeft));
+    h.pump();
+    assert_eq!(seen.get(), 2, "ArrowLeft wraps to the last tab");
 }

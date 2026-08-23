@@ -61,14 +61,17 @@ impl ComponentRecipe {
             }
         }
 
+        let state_style = self.state_styles.get_style(widget_state);
+        result.merge(&state_style);
+
+        // Compounds apply last: they carry StateStyle precedence (equal to
+        // state styles) and are merged after them, so a compound can refine
+        // the shared state style for a specific variant combination.
         for compound in &self.compound_variants {
             if compound.matches(effective_variants, widget_state) {
                 result.merge(compound.style());
             }
         }
-
-        let state_style = self.state_styles.get_style(widget_state);
-        result.merge(&state_style);
 
         result
     }

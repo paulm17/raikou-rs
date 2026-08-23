@@ -773,6 +773,7 @@ pub fn playground_notes(cx: &mut BuildCx, title: impl Into<String>, lines: &[&st
         Label::new(title)
             .font_size(20.0)
             .color(title_color)
+            .wrap(true)
             .build(cx),
     );
 
@@ -781,6 +782,7 @@ pub fn playground_notes(cx: &mut BuildCx, title: impl Into<String>, lines: &[&st
             Label::new(*line)
                 .font_size(13.0)
                 .color(line_color)
+                .wrap(true)
                 .build(cx),
         );
     }

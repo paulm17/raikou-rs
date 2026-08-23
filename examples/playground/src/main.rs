@@ -83,16 +83,23 @@ fn select(state: &RefCell<Selection>, ui: &mut UserInterface, theme: &Theme, ind
     use fyrox::graph::SceneGraph;
     use fyrox::gui::decorator::{Decorator, DecoratorMessage};
     let state = state.borrow();
-    // Active pill = accent background + white label; inactive = transparent.
+    // Active pill = compact rounded accent TINT (NavigationView style), not a
+    // solid accent slab; inactive = transparent.
     let accent = theme
         .color("accent.solid")
         .unwrap_or(Color::new(0.0, 0.47, 0.84, 1.0));
-    let accent_hover = theme
-        .color("accent.hover")
-        .unwrap_or(Color::new(0.26, 0.61, 0.89, 1.0));
     let idle_text = theme
         .color("text.primary")
         .unwrap_or(Color::new(0.06, 0.06, 0.07, 1.0));
+
+    // Accent tints at Fluent list-selection opacities (#CCE4F7-family over
+    // white, mirroring the selected-tab treatment).
+    let mut tint = accent;
+    tint.alpha = 0.2;
+    let mut tint_hover = accent;
+    tint_hover.alpha = 0.28;
+    let mut tint_pressed = accent;
+    tint_pressed.alpha = 0.34;
     let hover_idle = theme.color("fluent.control.hover");
     let pressed_idle = theme.color("fluent.control.pressed");
     let prop = |c: fyrox::core::color::Color| Brush::Solid(c).into();
@@ -111,9 +118,9 @@ fn select(state: &RefCell<Selection>, ui: &mut UserInterface, theme: &Theme, ind
         if let Some(decorator) = decorator {
             let (normal, hover, pressed) = if is_active {
                 (
-                    to_fyrox_color(accent),
-                    to_fyrox_color(accent_hover),
-                    to_fyrox_color(theme.color("accent.pressed").unwrap_or(accent)),
+                    to_fyrox_color(tint),
+                    to_fyrox_color(tint_hover),
+                    to_fyrox_color(tint_pressed),
                 )
             } else {
                 (
@@ -128,14 +135,9 @@ fn select(state: &RefCell<Selection>, ui: &mut UserInterface, theme: &Theme, ind
         }
 
         if let Some(text) = find_text_child(ui, button) {
-            ui.send(
-                text,
-                WidgetMessage::Foreground(if is_active {
-                    prop(fyrox::core::color::Color::WHITE)
-                } else {
-                    prop(to_fyrox_color(idle_text))
-                }),
-            );
+            // Dark text on the pale tint (matches selected-tab treatment);
+            // primary color when idle.
+            ui.send(text, WidgetMessage::Foreground(prop(to_fyrox_color(idle_text))));
         }
     }
 }
@@ -195,6 +197,8 @@ fn build_app(
             .text("Home")
             .variant(ButtonVariant::Ghost)
             .width(Length::Fixed(184.0))
+            // Rounded nav pill (NavigationView style), not a squared slab.
+            .corner_radius(4.0)
             .margin(Thickness::uniform(2.0))
             .on_click({
                 let sel = Rc::clone(&selection);
@@ -212,6 +216,8 @@ fn build_app(
                 .text((*label).to_string())
                 .variant(ButtonVariant::Ghost)
                 .width(Length::Fixed(184.0))
+                // Rounded nav pill (NavigationView style), not a squared slab.
+                .corner_radius(4.0)
                 .margin(Thickness::uniform(2.0))
                 .on_click(move |ui, _| select(&sel, ui, &theme, idx))
                 .build(&mut cx);

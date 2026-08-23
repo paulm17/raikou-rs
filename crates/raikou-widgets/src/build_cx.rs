@@ -53,4 +53,11 @@ impl<'a> BuildCx<'a> {
     pub fn register(&mut self, component: &Component) {
         self.registry.register(component);
     }
+
+    /// Registers a built component's handlers as a global listener that
+    /// observes every message in the UI (see
+    /// [`ComponentRegistry::register_global`]).
+    pub fn register_global(&mut self, component: &Component) {
+        self.registry.register_global(component);
+    }
 }

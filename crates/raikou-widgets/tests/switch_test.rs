@@ -2,7 +2,7 @@
 
 mod common;
 
-use common::{Counter, Harness};
+use common::Harness;
 use fyrox::graph::SceneGraph;
 use fyrox::gui::message::{MessageDirection, MouseButton, UiMessage};
 use fyrox::gui::toggle::ToggleButtonMessage;
@@ -90,4 +90,79 @@ fn find_track(
         }
     }
     Default::default()
+}
+
+#[test]
+fn switch_space_toggles_when_focus_inside() {
+    use fyrox::gui::message::KeyCode;
+
+    let mut h = Harness::new();
+    let values = std::rc::Rc::new(std::cell::RefCell::new(Vec::<bool>::new()));
+    let v = values.clone();
+    let sw = h.build(move |cx| {
+        Switch::new()
+            .toggled(false)
+            .on_change(move |_, val| v.borrow_mut().push(val))
+            .build(cx)
+    });
+
+    // Space with keyboard focus anywhere inside the switch toggles it.
+    h.ui.send(sw.handle, WidgetMessage::KeyDown(KeyCode::Space));
+    h.pump();
+    assert_eq!(
+        values.borrow().as_slice(),
+        &[true],
+        "Space inside the switch must toggle it"
+    );
+
+    // Space outside the subtree does nothing.
+    h.ui.send(h.ui.root(), WidgetMessage::KeyDown(KeyCode::Space));
+    h.pump();
+    assert_eq!(
+        values.borrow().as_slice(),
+        &[true],
+        "Space outside must be ignored"
+    );
+}
+
+#[test]
+fn switch_knob_slides_instead_of_snapping() {
+    use fyrox::core::algebra::Vector2;
+    use fyrox::gui::border::Border;
+    use fyrox::gui::message::KeyCode;
+    use fyrox::gui::UiUpdateSwitches;
+
+    let mut h = Harness::new();
+    let sw = h.build(move |cx| Switch::new().toggled(false).build(cx));
+    h.update_and_pump();
+
+    // Knob lives inside the track's decorator border.
+    let track = find_track(&mut h.ui, sw.handle);
+    let decorator = *h.ui.node(track).children().first().unwrap();
+    let knob = *h.ui.node(decorator).children().first().unwrap();
+
+    h.ui.send(sw.handle, WidgetMessage::KeyDown(KeyCode::Space));
+    h.pump();
+
+    // A couple frames in, the knob margin is mid-flight (strictly between
+    // the parked positions 2.5 and 23.5).
+    for _ in 0..2 {
+        h.ui
+            .update(Vector2::new(800.0, 600.0), 1.0 / 60.0, &UiUpdateSwitches::default());
+    }
+    h.pump();
+    let mid_left = h.ui.try_get_of_type::<Border>(knob).unwrap().widget.margin.left;
+    assert!(
+        mid_left > 2.5 && mid_left < 23.5,
+        "knob must animate smoothly mid-tween, saw {mid_left}"
+    );
+
+    // Once settled, the knob parks right with the resting margin.
+    for _ in 0..20 {
+        h.ui
+            .update(Vector2::new(800.0, 600.0), 1.0 / 60.0, &UiUpdateSwitches::default());
+    }
+    h.pump();
+    let border = h.ui.try_get_of_type::<Border>(knob).unwrap();
+    assert_eq!(border.widget.margin.left, 2.5, "settled knob rests at pad");
 }

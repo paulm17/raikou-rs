@@ -24,6 +24,9 @@ use crate::convert::{to_fyrox_color, to_fyrox_thickness};
 
 type ItemClickCallback = dyn Fn(&mut UserInterface, usize);
 
+/// Fluent menu flyout row height (~32px in the reference shell).
+const FLUENT_MENU_ROW_HEIGHT: f32 = 32.0;
+
 /// Applies Fluent flyout styling to every popup body and menu-item
 /// decorator reachable from `roots` (including nested sub-menu popups,
 /// which live outside the normal widget tree). Items listed in `disabled`
@@ -125,6 +128,30 @@ pub(crate) fn style_menu_chrome(
                 decorator,
                 DecoratorMessage::SelectedBrush(hover.clone().into()),
             );
+
+            // Fluent flyout rows: ~32px tall with the content grid
+            // (already center-aligned by fyrox) vertically centered.
+            ui.send(h, WidgetMessage::Height(FLUENT_MENU_ROW_HEIGHT));
+            ui.send(decorator, WidgetMessage::Height(FLUENT_MENU_ROW_HEIGHT));
+
+            // Fluent flyouts hug their content: the stock item grid uses a
+            // Stretch text column which absorbs any leftover width handed to
+            // the popup, stretching short flyouts across the full available
+            // width. Swap it for Auto so grids measure naturally.
+            if let Some(&grid_handle) = ui.node(decorator).children().first() {
+                if let Ok(grid) = ui.try_get_mut_of_type::<fyrox::gui::grid::Grid>(grid_handle) {
+                    let cols: Vec<fyrox::gui::grid::Column> =
+                        grid.columns.borrow().clone();
+                    if cols.len() == 5
+                        && cols[1].size_mode == fyrox::gui::grid::SizeMode::Stretch
+                    {
+                        let mut cols = cols;
+                        cols[1] = fyrox::gui::grid::Column::auto();
+                        grid.columns
+                            .set_value_and_mark_modified(std::cell::RefCell::new(cols));
+                    }
+                }
+            }
         }
 
         for child in ui.node(h).children().to_vec() {

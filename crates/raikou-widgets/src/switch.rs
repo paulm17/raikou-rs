@@ -10,17 +10,24 @@ use fyrox::core::pool::Handle;
 use fyrox::gui::border::Border;
 use fyrox::gui::brush::Brush;
 use fyrox::gui::decorator::{Decorator, DecoratorMessage};
-use fyrox::gui::message::{MessageDirection, UiMessage};
-use fyrox::gui::toggle::{ToggleButtonBuilder, ToggleButtonMessage};
+use fyrox::gui::message::{KeyCode, MessageDirection, UiMessage};
+use fyrox::gui::toggle::{ToggleButton, ToggleButtonBuilder, ToggleButtonMessage};
 use fyrox::gui::widget::{WidgetBuilder, WidgetMessage};
 use fyrox::gui::Thickness as FyroxThickness;
 use fyrox::gui::{HorizontalAlignment, UiNode, UserInterface, VerticalAlignment};
+use fyrox::graph::SceneGraph;
 
 use raikou_core::Thickness;
 
 use crate::build_cx::BuildCx;
-use crate::component::{Component, ComponentKind};
+use crate::component::{is_in_subtree, Component, ComponentKind};
 use crate::convert::{to_fyrox_color, to_fyrox_thickness};
+use crate::tween::{spawn_tweener, TweenJob, TweenMessage};
+
+/// Knob inset from the track edges (both themes).
+const KNOB_PAD: f32 = 2.5;
+/// Distance between the knob's two rest positions (40 - 14 - 2 * 2.5).
+const KNOB_SPAN: f32 = 21.0;
 
 type ChangeCallback = dyn Fn(&mut UserInterface, bool);
 
@@ -33,11 +40,41 @@ pub struct SwitchHandlers {
     pub command_target: Handle<UiNode>,
     /// Sliding knob node kept in sync with the toggled state.
     pub knob: Handle<UiNode>,
+    /// The full switch (stack incl. label); scopes key handling.
+    pub(crate) subtree: Handle<UiNode>,
+    /// Tweener node that animates the knob; `None` snaps instantly.
+    pub(crate) animator: Option<Handle<UiNode>>,
+    /// When set, this handler clone only reacts to Space key presses
+    /// (used by the global watcher so sibling echoes are ignored).
+    pub(crate) keys_only: bool,
 }
 
 impl SwitchHandlers {
     /// Routes a UI message to the matching handler.
     pub fn dispatch(&self, ui: &mut UserInterface, message: &UiMessage) {
+        // Space toggles the switch when the event lands inside its subtree
+        // (fyrox ToggleButton has no key handling of its own).
+        if let Some(WidgetMessage::KeyDown(KeyCode::Space)) =
+            message.data::<WidgetMessage>()
+        {
+            if message.direction() == MessageDirection::ToWidget
+                && is_in_subtree(ui, message.destination(), self.subtree)
+            {
+                let flipped = ui
+                    .try_get_of_type::<ToggleButton>(self.command_target)
+                    .map(|track| !track.is_toggled)
+                    .ok();
+                if let Some(state) = flipped {
+                    ui.send(self.command_target, ToggleButtonMessage::Toggled(state));
+                }
+            }
+            return;
+        }
+
+        if self.keys_only {
+            return;
+        }
+
         if let Some(ToggleButtonMessage::Toggled(state)) = message.data::<ToggleButtonMessage>() {
             if message.direction() == MessageDirection::ToWidget {
                 if message.destination() != self.command_target {
@@ -45,15 +82,30 @@ impl SwitchHandlers {
                 }
                 return;
             }
-            // Keep the knob on the correct side of the track.
-            ui.send(
-                self.knob,
-                WidgetMessage::HorizontalAlignment(if *state {
-                    HorizontalAlignment::Right
-                } else {
-                    HorizontalAlignment::Left
-                }),
-            );
+            // Slide the knob to the correct side of the track; the tweener
+            // interpolates the travel, otherwise snap straight to it.
+            match self.animator {
+                Some(tweener) => {
+                    ui.send(
+                        tweener,
+                        TweenMessage(TweenJob::KnobSlide {
+                            knob: self.knob,
+                            pad: KNOB_PAD,
+                            span: KNOB_SPAN,
+                        }),
+                    );
+                }
+                None => {
+                    ui.send(
+                        self.knob,
+                        WidgetMessage::HorizontalAlignment(if *state {
+                            HorizontalAlignment::Right
+                        } else {
+                            HorizontalAlignment::Left
+                        }),
+                    );
+                }
+            }
             if let Some(callback) = &self.on_change {
                 callback(ui, *state);
             }
@@ -270,7 +322,12 @@ impl Switch {
             on_change: None,
             command_target: track,
             knob,
+            subtree: outer,
+            animator: None,
+            keys_only: false,
         });
+        // Tweener node that animates the knob slide.
+        let tweener = spawn_tweener(&mut cx.ctx(), outer);
         let component_outer = Component {
             handle: outer,
             kind: kind.clone(),
@@ -281,10 +338,23 @@ impl Switch {
                 on_change: self.on_change.clone(),
                 command_target: track,
                 knob,
+                subtree: outer,
+                animator: Some(tweener),
+                keys_only: false,
             }),
         };
         cx.register(&component_outer);
         cx.register(&component_inner);
+        // Global watcher so Space works when a deep child (decorator, knob)
+        // holds focus; the keys-only clone ignores state echoes entirely.
+        let mut key_watcher = kind.clone();
+        if let ComponentKind::Switch(handlers) = &mut key_watcher {
+            handlers.keys_only = true;
+        }
+        cx.register_global(&Component {
+            handle: outer,
+            kind: key_watcher,
+        });
         component_outer
     }
 }

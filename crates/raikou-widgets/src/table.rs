@@ -253,11 +253,13 @@ impl Table {
         let inner: Handle<UiNode> = grid_builder.build(&mut ctx).to_base();
 
         // Fluent frame: 1px stroke around the whole grid (Avalonia DataGrid
-        // has a full outer border).
+        // has a full outer border). The interior must stay transparent:
+        // fyrox fills an unset background with the global primary brush.
         let handle = BorderBuilder::new(
             WidgetBuilder::new()
                 .with_name("raikou_table_frame")
                 .with_margin(to_fyrox_thickness(self.margin))
+                .with_background(Brush::Solid(transparent).into())
                 .with_foreground(Brush::Solid(stroke).into())
                 .with_child(inner),
         )

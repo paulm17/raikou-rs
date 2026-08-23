@@ -57,6 +57,7 @@ fn build_demo_panel(
 
     let mut buttons: Vec<Handle<UiNode>> = Vec::new();
     for variant in [
+        ButtonVariant::Default,
         ButtonVariant::Filled,
         ButtonVariant::Outline,
         ButtonVariant::Ghost,
@@ -163,6 +164,7 @@ fn build_demo_panel(
 
 fn variant_label(variant: ButtonVariant) -> &'static str {
     match variant {
+        ButtonVariant::Default => "Default",
         ButtonVariant::Filled => "Filled",
         ButtonVariant::Outline => "Outline",
         ButtonVariant::Ghost => "Ghost",

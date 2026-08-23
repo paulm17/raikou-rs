@@ -16,6 +16,9 @@ use crate::Theme;
 /// Visual appearance of a button.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum ButtonVariant {
+    /// Neutral standard button: translucent gray fill with a 1px border
+    /// (the Avalonia Fluent `<Button>` default look).
+    Default,
     /// Solid accent fill.
     #[default]
     Filled,
@@ -33,6 +36,7 @@ impl ButtonVariant {
     /// The variant key used by theme recipes.
     pub fn name(self) -> &'static str {
         match self {
+            ButtonVariant::Default => "default",
             ButtonVariant::Filled => "filled",
             ButtonVariant::Outline => "outline",
             ButtonVariant::Ghost => "ghost",
@@ -105,10 +109,22 @@ impl Theme {
         let hover_alpha = style_f32(&hovered, box_style::OPACITY, 1.0);
         let pressed_alpha = style_f32(&pressed, box_style::OPACITY, 1.0);
 
+        // If the hovered/pressed resolution overrides the background outright
+        // (Fluent state/compound styles do), use that color; otherwise fall
+        // back to the opacity model (idle fill dimmed by the state's OPACITY).
+        let hover = match style_color(&hovered, box_style::BACKGROUND, background) {
+            c if c != background => c,
+            _ => with_alpha(background, background.alpha * hover_alpha),
+        };
+        let pressed_bg = match style_color(&pressed, box_style::BACKGROUND, background) {
+            c if c != background => c,
+            _ => with_alpha(background, background.alpha * pressed_alpha),
+        };
+
         ButtonStyle {
             background,
-            hover: with_alpha(background, background.alpha * hover_alpha),
-            pressed: with_alpha(background, background.alpha * pressed_alpha),
+            hover,
+            pressed: pressed_bg,
             text,
             border,
             border_thickness: if border_width > 0.0 {
@@ -196,6 +212,42 @@ mod tests {
         let theme = Theme::light();
         let style = theme.resolve_button_style(ButtonVariant::Outline, ControlSize::Medium);
         assert!(approx(style.border_thickness.left, 1.0));
+    }
+
+    #[test]
+    fn fluent_default_variant_matches_avalonia_standard_button() {
+        let theme = crate::theme::fluent::fluent_light();
+        let style = theme.resolve_button_style(ButtonVariant::Default, ControlSize::Medium);
+        // Idle: BaseLow fill (black @ 20%), transparent 1px border.
+        assert!(approx(style.background.alpha, 0.2));
+        assert!(approx(style.border_thickness.left, 1.0));
+        assert!(approx(style.border.red, 0.0));
+        assert!(approx(style.border.alpha, 0.0));
+        // Hover: BaseHigh @ 10% (lighter).
+        assert!(approx(style.hover.alpha, 0.1));
+        assert!(approx(style.pressed.alpha, 0.4));
+    }
+
+    #[test]
+    fn fluent_default_variant_dark_uses_white_fill() {
+        let theme = crate::theme::fluent::fluent_dark();
+        let style = theme.resolve_button_style(ButtonVariant::Default, ControlSize::Medium);
+        assert!(approx(style.background.alpha, 0.2));
+        assert!(approx(style.background.red, 1.0));
+        assert!(approx(style.hover.alpha, 0.1));
+        assert!(approx(style.pressed.alpha, 0.4));
+    }
+
+    #[test]
+    fn fluent_filled_hover_uses_accent_light_shade() {
+        let theme = crate::theme::fluent::fluent_light();
+        let style = theme.resolve_button_style(ButtonVariant::Filled, ControlSize::Medium);
+        // AccentButtonBackgroundPointerOver = SystemAccentColorLight1 #429CE3.
+        assert!(approx(style.hover.red, 0x42 as f32 / 255.0));
+        assert!(approx(style.hover.green, 0x9C as f32 / 255.0));
+        assert!(approx(style.hover.blue, 0xE3 as f32 / 255.0));
+        // Pressed = SystemAccentColorDark1 #005A9E.
+        assert!(approx(style.pressed.blue, 0x9E as f32 / 255.0));
     }
 
     #[test]

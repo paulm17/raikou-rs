@@ -1,8 +1,9 @@
 //! loading_indicator panel — playground demo for `LoadingIndicator`.
 //!
 //! Port of the reference `loading_indicator_demo`: two rows of indicators
-//! covering eight of the nine modes (Arc, Ring, ThreeDots, Wave, Pulse,
-//! ArcsRing, DoubleBounce, FlipPlane), all animating from startup.
+//! covering eight of the ten modes (Arc, Ring, ThreeDots, Wave, Pulse,
+//! ArcsRing, DoubleBounce, FlipPlane) with explicit demo colors, plus a row
+//! showing the Fluent defaults (monochrome theme accent) and the Bar mode.
 
 use fyrox::core::pool::Handle;
 use fyrox::gui::widget::WidgetMessage;
@@ -19,11 +20,13 @@ const CODE: &str = r#"Group::new()
             .size(30.0)
             .color(Color::new(0.19, 0.55, 0.95, 1.0)),
     )
+    // No explicit color: monochrome theme accent (Fluent default).
+    .child(LoadingIndicator::new().mode(LoadingIndicatorMode::Pulse).size(30.0))
+    // Fluent indeterminate bar.
     .child(
         LoadingIndicator::new()
-            .mode(LoadingIndicatorMode::Ring)
-            .size(30.0)
-            .color(Color::new(0.12, 0.71, 0.48, 1.0)),
+            .mode(LoadingIndicatorMode::Bar)
+            .width(Length::Fixed(200.0)),
     )"#;
 
 pub fn loading_indicator_panel(
@@ -97,10 +100,42 @@ pub fn loading_indicator_panel(
         )
         .build(&mut cx);
 
+    // Fluent defaults: no explicit color -> monochrome theme accent,
+    // plus the indeterminate Bar mode.
+    let row3 = Group::new()
+        .spacing(24.0)
+        .child(
+            LoadingIndicator::new()
+                .mode(LoadingIndicatorMode::Arc)
+                .size(30.0)
+                .build(&mut cx),
+        )
+        .child(
+            LoadingIndicator::new()
+                .mode(LoadingIndicatorMode::Pulse)
+                .size(30.0)
+                .build(&mut cx),
+        )
+        .child(
+            LoadingIndicator::new()
+                .mode(LoadingIndicatorMode::ThreeDots)
+                .size(30.0)
+                .build(&mut cx),
+        )
+        .child(
+            LoadingIndicator::new()
+                .mode(LoadingIndicatorMode::Bar)
+                .width(Length::Fixed(200.0))
+                .stroke_width(3.0)
+                .build(&mut cx),
+        )
+        .build(&mut cx);
+
     let preview_content: Handle<UiNode> = Stack::new()
         .spacing(26.0)
         .child(row1)
         .child(row2)
+        .child(row3)
         .build(&mut cx)
         .into();
 

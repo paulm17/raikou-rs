@@ -14,7 +14,9 @@ const CODE: &str = r##"Table::new()
     .column(TableColumn::new("Status", 120.0))
     .column(TableColumn::new("Owner", 180.0))
     .row(vec!["#1428", "Running", "CI"])
-    .row(vec!["#1427", "Passed", "Release bot"])"##;
+    .row(vec!["#1427", "Passed", "Release bot"])
+// zebra striping is opt-in (off by default, like the
+// Avalonia DataGrid reference): .zebra(true)"##;
 
 pub fn table_panel(
     ui: &mut UserInterface,

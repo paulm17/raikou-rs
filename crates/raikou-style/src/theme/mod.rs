@@ -22,7 +22,9 @@ pub use tokens::{
 pub use variant::ThemeVariantScope;
 
 use crate::property::{box_style, layout, text_style};
-use crate::recipe::{ComponentRecipe, RecipeKey};
+use crate::recipe::{
+    CompoundVariant, CompoundVariantCondition, ComponentRecipe, RecipeKey,
+};
 use crate::state::WidgetState;
 use crate::style::{StylePrecedence, StyleSource};
 use crate::style_value::TokenScale;
@@ -123,6 +125,7 @@ pub struct ComponentRecipeBuilder {
     base_style: crate::Style,
     variants: std::collections::HashMap<SmolStr, crate::Style>,
     state_styles: Vec<(WidgetState, crate::Style)>,
+    compound_variants: Vec<CompoundVariant>,
 }
 
 impl ComponentRecipeBuilder {
@@ -132,6 +135,7 @@ impl ComponentRecipeBuilder {
             base_style: crate::Style::new(),
             variants: std::collections::HashMap::new(),
             state_styles: Vec::new(),
+            compound_variants: Vec::new(),
         }
     }
 
@@ -164,6 +168,21 @@ impl ComponentRecipeBuilder {
         self
     }
 
+    /// Registers a compound variant: a style applied only when the given
+    /// variant + state conditions all match. Compound entries authored from
+    /// recipes use `StateStyle` precedence so they can refine (or override)
+    /// shared state styles for specific variants.
+    pub fn compound(
+        &mut self,
+        conditions: Vec<CompoundVariantCondition>,
+        f: impl FnOnce(&mut crate::Style),
+    ) -> &mut Self {
+        let mut style = crate::Style::new();
+        f(&mut style);
+        self.compound_variants.push(CompoundVariant::new(conditions, style));
+        self
+    }
+
     pub fn build(self) -> ComponentRecipe {
         use crate::recipe::StateStyleMap;
         let mut state_map = StateStyleMap::new();
@@ -174,7 +193,7 @@ impl ComponentRecipeBuilder {
             key: RecipeKey::base(self.component),
             base_style: self.base_style,
             variants: self.variants,
-            compound_variants: Vec::new(),
+            compound_variants: self.compound_variants,
             default_variants: crate::recipe::VariantMap::new(),
             state_styles: state_map,
         }
@@ -475,6 +494,32 @@ impl Theme {
                     s.set_color(
                         text_style::COLOR,
                         Color::new(1.0, 1.0, 1.0, 1.0),
+                        StylePrecedence::Variant,
+                        StyleSource::Variant,
+                    );
+                });
+                b.variant("appearance", "default", |s| {
+                    s.set_color(
+                        box_style::BACKGROUND,
+                        Color::new(0.97, 0.97, 0.98, 1.0),
+                        StylePrecedence::Variant,
+                        StyleSource::Variant,
+                    );
+                    s.set_color(
+                        box_style::BORDER_COLOR,
+                        Color::new(0.90, 0.90, 0.91, 1.0),
+                        StylePrecedence::Variant,
+                        StyleSource::Variant,
+                    );
+                    s.set_f32(
+                        box_style::BORDER_WIDTH,
+                        1.0,
+                        StylePrecedence::Variant,
+                        StyleSource::Variant,
+                    );
+                    s.set_color(
+                        text_style::COLOR,
+                        Color::new(0.09, 0.09, 0.10, 1.0),
                         StylePrecedence::Variant,
                         StyleSource::Variant,
                     );
@@ -861,6 +906,32 @@ impl Theme {
                     s.set_color(
                         text_style::COLOR,
                         Color::new(0.09, 0.09, 0.11, 1.0),
+                        StylePrecedence::Variant,
+                        StyleSource::Variant,
+                    );
+                });
+                b.variant("appearance", "default", |s| {
+                    s.set_color(
+                        box_style::BACKGROUND,
+                        Color::new(0.13, 0.13, 0.15, 1.0),
+                        StylePrecedence::Variant,
+                        StyleSource::Variant,
+                    );
+                    s.set_color(
+                        box_style::BORDER_COLOR,
+                        Color::new(0.30, 0.30, 0.33, 1.0),
+                        StylePrecedence::Variant,
+                        StyleSource::Variant,
+                    );
+                    s.set_f32(
+                        box_style::BORDER_WIDTH,
+                        1.0,
+                        StylePrecedence::Variant,
+                        StyleSource::Variant,
+                    );
+                    s.set_color(
+                        text_style::COLOR,
+                        Color::new(0.97, 0.97, 0.98, 1.0),
                         StylePrecedence::Variant,
                         StyleSource::Variant,
                     );

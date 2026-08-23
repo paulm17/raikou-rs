@@ -76,3 +76,65 @@ fn checkbox_native_click_toggles() {
     assert_eq!(vals.len(), 1, "click must produce exactly one change");
     assert_eq!(vals[0], true, "click on unchecked box must check it");
 }
+
+#[test]
+fn checkbox_three_state_cycles_like_avalonia() {
+    use fyrox::gui::check_box::CheckBox;
+
+    let mut h = Harness::new();
+    let seen = std::rc::Rc::new(std::cell::RefCell::new(Vec::<Option<bool>>::new()));
+    let s = seen.clone();
+    let cb = h.build(move |cx| {
+        Checkbox::new()
+            .text("Tri")
+            .three_state(true)
+            .state(Some(false))
+            .on_change_state(move |_, state| s.borrow_mut().push(state))
+            .build(cx)
+    });
+
+    assert_eq!(
+        *h.ui.try_get_of_type::<CheckBox>(cb.handle).unwrap().checked,
+        Some(false),
+        "initial indeterminate=false state"
+    );
+
+    // Avalonia cycle from false: null -> true -> false. Each click is a
+    // MouseUp over the box (native toggles on release).
+    for _ in 0..3 {
+        h.ui.send(
+            cb.handle,
+            WidgetMessage::MouseUp {
+                pos: Default::default(),
+                button: MouseButton::Left,
+            },
+        );
+        h.update_and_pump();
+    }
+
+    assert_eq!(
+        *seen.borrow(),
+        vec![None, Some(true), Some(false)],
+        "cycle must match Avalonia CheckBox.Toggle"
+    );
+    assert_eq!(
+        *h.ui.try_get_of_type::<CheckBox>(cb.handle).unwrap().checked,
+        Some(false),
+        "full cycle returns to false"
+    );
+}
+
+#[test]
+fn checkbox_three_state_programmatic_initial() {
+    use fyrox::gui::check_box::CheckBox;
+
+    let mut h = Harness::new();
+    let cb = h.build(|cx| Checkbox::new().three_state(true).state(None).build(cx));
+
+    h.update_and_pump();
+    assert_eq!(
+        *h.ui.try_get_of_type::<CheckBox>(cb.handle).unwrap().checked,
+        None,
+        "state(Some(None)) must build an indeterminate checkbox"
+    );
+}

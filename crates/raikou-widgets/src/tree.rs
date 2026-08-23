@@ -1,10 +1,12 @@
 //! Tree component: a recursive node list backed by fyrox's `Tree`/`TreeRoot`.
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use fyrox::core::pool::Handle;
-use fyrox::gui::message::{MessageDirection, UiMessage};
-use fyrox::gui::tree::{TreeBuilder, TreeRootBuilder, TreeRootMessage};
+use fyrox::gui::message::{MessageData, MessageDirection, UiMessage};
+use fyrox::gui::tree::{Tree as FyroxTree, TreeBuilder, TreeRootBuilder, TreeRootMessage};
 use fyrox::gui::widget::WidgetBuilder;
 use fyrox::gui::{UiNode, UserInterface};
 
@@ -16,6 +18,17 @@ use crate::component::{Component, ComponentKind};
 use crate::convert::to_fyrox_thickness;
 
 type SelectCallback = dyn Fn(&mut UserInterface, usize);
+type SelectionCallback = dyn Fn(&mut UserInterface, Vec<usize>);
+
+/// Programmatic commands accepted by a built tree (send `ToWidget` to the
+/// component handle).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TreeCommand {
+    /// Selects the nodes at the given depth-first indices (empty clears).
+    Select(Vec<usize>),
+}
+
+impl MessageData for TreeCommand {}
 
 /// One descendant tree's expander: the checkbox handle, its checked state,
 /// the two stock mark handles and the background border that hosts them.
@@ -72,22 +85,58 @@ impl TreeNode {
         self.expanded = true;
         self
     }
+
+    /// Marks the node as selected initially.
+    pub fn selected(mut self) -> Self {
+        self.selected = true;
+        self
+    }
 }
 
 /// Event handlers of a Tree component.
 #[derive(Clone)]
 pub struct TreeHandlers {
     on_select: Option<Rc<SelectCallback>>,
+    on_selection: Option<Rc<SelectionCallback>>,
+    /// The built tree root (command translation target).
+    root: Handle<UiNode>,
+    /// Depth-first node handles (children before parent); index = position in the user's model.
+    nodes: Rc<Vec<Handle<FyroxTree>>>,
+    /// Node handle → depth-first index for payload mapping.
+    index_of: Rc<RefCell<HashMap<Handle<FyroxTree>, usize>>>,
 }
 
 impl TreeHandlers {
     pub fn dispatch(&self, ui: &mut UserInterface, message: &UiMessage) {
-        if message.direction() != MessageDirection::FromWidget {
+        if let Some(TreeRootMessage::Select(selected)) = message.data::<TreeRootMessage>() {
+            if message.direction() == MessageDirection::FromWidget {
+                if let Some(on_select) = &self.on_select {
+                    on_select(ui, selected.len());
+                }
+                // Lossless payload: map fyrox handles back to depth-first
+                // indices in the user's model (unknown handles are skipped).
+                let indices: Vec<usize> = {
+                    let index_of = self.index_of.borrow();
+                    selected
+                        .iter()
+                        .filter_map(|h| index_of.get(h).copied())
+                        .collect()
+                };
+                if let Some(on_selection) = &self.on_selection {
+                    on_selection(ui, indices);
+                }
+            }
             return;
         }
-        if let Some(on_select) = &self.on_select {
-            if let Some(TreeRootMessage::Select(selected)) = message.data::<TreeRootMessage>() {
-                on_select(ui, selected.len());
+        // Programmatic selection by model index.
+        if message.direction() == MessageDirection::ToWidget {
+            if let Some(TreeCommand::Select(indices)) = message.data::<TreeCommand>() {
+                let nodes = self.nodes.clone();
+                let handles: Vec<Handle<FyroxTree>> = indices
+                    .iter()
+                    .filter_map(|i| nodes.get(*i).copied())
+                    .collect();
+                ui.send(self.root, TreeRootMessage::Select(handles));
             }
         }
     }
@@ -99,6 +148,7 @@ pub struct Tree {
     roots: Vec<TreeNode>,
     item_height: f32,
     on_select: Option<Rc<SelectCallback>>,
+    on_selection: Option<Rc<SelectionCallback>>,
     margin: Thickness,
 }
 
@@ -113,8 +163,10 @@ impl Tree {
     pub fn new() -> Self {
         Self {
             roots: Vec::new(),
-            item_height: 28.0,
+            // Fluent TreeView rows are ~32px tall; fyrox bakes 24px.
+            item_height: 32.0,
             on_select: None,
+            on_selection: None,
             margin: Thickness::ZERO,
         }
     }
@@ -125,7 +177,7 @@ impl Tree {
         self
     }
 
-    /// Sets the item height (clamped to a minimum of 16).
+    /// Sets the item row height (clamped to a minimum of 16).
     pub fn item_height(mut self, height: f32) -> Self {
         self.item_height = height.max(16.0);
         self
@@ -146,15 +198,33 @@ impl Tree {
         self
     }
 
+    /// Sets the callback invoked when a selection changes (passes the
+    /// depth-first indices of every selected node — lossless payload).
+    pub fn on_selection<F>(mut self, callback: F) -> Self
+    where
+        F: Fn(&mut UserInterface, Vec<usize>) + 'static,
+    {
+        self.on_selection = Some(Rc::new(callback));
+        self
+    }
+
     /// Builds the tree, adds it to the UI and registers its handlers.
     pub fn build(self, cx: &mut BuildCx) -> Component {
         let mut ctx = cx.ctx();
         let font = ctx.default_font();
 
-        let root_nodes: Vec<Handle<fyrox::gui::tree::Tree>> = self
+        // Build every node, in collecting depth-first handles (index = position        // in the user's model) plus the requested initial-selection flags.
+        let mut nodes: Vec<Handle<FyroxTree>> = Vec::new();
+        let mut selected_flags: Vec<bool> = Vec::new();
+        let root_nodes: Vec<Handle<FyroxTree>> = self
             .roots
             .iter()
-            .map(|node| build_tree_node(node, font.clone(), &mut ctx))
+            .map(|node| {
+                let mut flags = Vec::new();
+                collect_selection_flags(node, &mut flags);
+                selected_flags.append(&mut flags);
+                build_tree_node(node, font.clone(), &mut ctx, &mut nodes)
+            })
             .collect();
 
         let handle = TreeRootBuilder::new(
@@ -265,10 +335,129 @@ impl Tree {
             }
         }
 
+        // Fluent row chrome: fyrox bakes 24px rows with a saturated dim-blue
+        // selection brush and an opaque hover brush; restyle every descendant
+        // tree to subtle list tints and apply the requested item height.
+        {
+            use fyrox::graph::SceneGraph;
+            use fyrox::gui::brush::Brush;
+            use fyrox::gui::decorator::Decorator;
+            use fyrox::gui::grid::{Grid, Row, SizeMode};
+            use fyrox::gui::widget::WidgetMessage;
+            use fyrox::gui::VerticalAlignment;
+            use std::cell::RefCell;
+
+            use crate::convert::to_fyrox_color;
+
+            let theme = cx.theme().clone();
+            let hover_brush = Brush::Solid(to_fyrox_color(
+                theme
+                    .color("fluent.list.low")
+                    .unwrap_or(raikou_core::Color::new(0.0, 0.0, 0.0, 0.05)),
+            ));
+            let selected_brush = Brush::Solid(to_fyrox_color(
+                theme
+                    .color("fluent.list.medium")
+                    .unwrap_or(raikou_core::Color::new(0.0, 0.0, 0.0, 0.10)),
+            ));
+
+            // Collect every descendant tree first (immutable pass), then
+            // mutate: try_get_of_type borrows the UI for the duration.
+            let trees: Vec<Handle<UiNode>> = {
+                let ui = cx.ui();
+                let mut stack = vec![handle];
+                let mut visited = vec![handle];
+                let mut trees = Vec::new();
+                while let Some(h) = stack.pop() {
+                    if h.is_none() {
+                        continue;
+                    }
+                    if ui.try_get_of_type::<fyrox::gui::tree::Tree>(h).is_ok() {
+                        trees.push(h);
+                    }
+                    for child in ui.node(h).children().to_vec() {
+                        if !child.is_none() && !visited.contains(&child) {
+                            visited.push(child);
+                            stack.push(child);
+                        }
+                    }
+                }
+                trees
+            };
+
+            let ui = cx.ui();
+            for tree_handle in trees {
+                let Ok(tree) = ui.try_get_of_type::<fyrox::gui::tree::Tree>(tree_handle) else {
+                    continue;
+                };
+                let background = tree.background;
+                let content = tree.content;
+                let expander: Handle<UiNode> = tree.expander.to_base();
+
+                // Swap the stock hover/selection brushes for Fluent list tints.
+                if let Some(decorator) = ui.node_mut(background).cast_mut::<Decorator>() {
+                    decorator
+                        .hover_brush
+                        .set_value_and_mark_modified(hover_brush.clone().into());
+                    decorator
+                        .selected_brush
+                        .set_value_and_mark_modified(selected_brush.clone().into());
+                }
+
+                // Row heights live in two grids: the outer row strip and the
+                // internals grid nested inside the item background border
+                // (which insets its child by its 1px stroke on each side).
+                let item_height = self.item_height.max(16.0);
+                let outer_grid = ui.node(tree_handle).children()[0];
+                let internals_grid = ui.node(background).children()[0];
+                for (grid, height) in [
+                    (outer_grid, item_height),
+                    (internals_grid, item_height - 2.0),
+                ] {
+                    if let Some(grid) = ui.node_mut(grid).cast_mut::<Grid>() {
+                        let mut rows = grid.rows.borrow().clone();
+                        if rows.is_empty() || rows[0].size_mode != SizeMode::Strict {
+                            continue;
+                        }
+                        rows[0] = Row::strict(height);
+                        grid.rows.set_value_and_mark_modified(RefCell::new(rows));
+                    }
+                }
+
+                // Center the label and expander within the taller row.
+                ui.send(content, WidgetMessage::VerticalAlignment(VerticalAlignment::Center));
+                ui.send(expander, WidgetMessage::VerticalAlignment(VerticalAlignment::Center));
+            }
+        }
+
+        // Initial selection: fyrox hardcodes `is_selected: false` at build,
+        // so revive `TreeNode.selected` by posting the selection after build.
+        {
+            let ui = cx.ui();
+            let selected_handles: Vec<Handle<FyroxTree>> = nodes
+                .iter()
+                .zip(&selected_flags)
+                .filter(|(_, sel)| **sel)
+                .map(|(h, _)| *h)
+                .collect();
+            if !selected_handles.is_empty() {
+                ui.send(handle, TreeRootMessage::Select(selected_handles));
+            }
+        }
+
+        let index_of: HashMap<Handle<FyroxTree>, usize> = nodes
+            .iter()
+            .enumerate()
+            .map(|(i, h)| (*h, i))
+            .collect();
         let component = Component {
             handle,
             kind: ComponentKind::Tree(TreeHandlers {
                 on_select: self.on_select,
+                on_selection: self.on_selection,
+                root: handle,
+                nodes: Rc::new(nodes),
+                index_of: Rc::new(RefCell::new(index_of)),
             }),
         };
         cx.register(&component);
@@ -276,28 +465,45 @@ impl Tree {
     }
 }
 
-/// Recursively builds a `TreeNode` into a fyrox `Tree`.
+/// Collects the `selected` flags of a node subtree. Traversal mirrors
+/// `build_tree_node`'s handle emission order (children first — fyrox trees
+/// are built bottom-up, so a parent's handle exists only after its
+/// children's).
+fn collect_selection_flags(node: &TreeNode, flags: &mut Vec<bool>) {
+    for child in &node.children {
+        collect_selection_flags(child, flags);
+    }
+    flags.push(node.selected);
+}
+
+/// Recursively builds a `TreeNode` into a fyrox `Tree`, appending each
+/// created handle to `nodes` in depth-first.
 fn build_tree_node(
     node: &TreeNode,
     font: fyrox::gui::font::FontResource,
     ctx: &mut fyrox::gui::BuildContext,
-) -> Handle<fyrox::gui::tree::Tree> {
+    nodes: &mut Vec<Handle<FyroxTree>>,
+) -> Handle<FyroxTree> {
     let label: Handle<UiNode> = fyrox::gui::text::TextBuilder::new(WidgetBuilder::new())
         .with_text(&node.label)
         .with_font(font.clone())
         .build(ctx)
         .to_base();
 
-    let mut child_trees: Vec<Handle<fyrox::gui::tree::Tree>> = Vec::new();
+    let mut child_trees: Vec<Handle<FyroxTree>> = Vec::new();
+    let mut child_nodes: Vec<Handle<FyroxTree>> = Vec::new();
     for child in &node.children {
-        child_trees.push(build_tree_node(child, font.clone(), ctx));
+        child_trees.push(build_tree_node(child, font.clone(), ctx, &mut child_nodes));
     }
+    nodes.append(&mut child_nodes);
 
-    TreeBuilder::new(WidgetBuilder::new())
+    let tree = TreeBuilder::new(WidgetBuilder::new())
         .with_content(label)
         .with_items(child_trees)
         .with_expanded(node.expanded)
-        .build(ctx)
+        .build(ctx);
+    nodes.push(tree);
+    tree
 }
 
 /// A handle to a built tree.

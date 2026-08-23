@@ -2,7 +2,7 @@
 
 mod common;
 
-use common::{Counter, Harness};
+use common::Harness;
 use fyrox::graph::SceneGraph;
 use fyrox::gui::check_box::CheckBoxMessage;
 use raikou_widgets::{Radio, RadioGroup};

@@ -2,6 +2,7 @@
 
 use fyrox::core::pool::Handle;
 use fyrox::gui::brush::Brush;
+use fyrox::gui::formatted_text::WrapMode;
 use fyrox::gui::text::{TextBuilder, TextMessage};
 use fyrox::gui::widget::WidgetBuilder;
 use fyrox::gui::UiNode;
@@ -19,6 +20,7 @@ pub struct Label {
     color: Option<Color>,
     font_size: f32,
     margin: Thickness,
+    wrap: bool,
 }
 
 impl Label {
@@ -29,6 +31,7 @@ impl Label {
             color: None,
             font_size: 16.0,
             margin: Thickness::ZERO,
+            wrap: false,
         }
     }
 
@@ -56,6 +59,13 @@ impl Label {
         self
     }
 
+    /// Enables word wrapping (off by default). Wrapping only takes effect when
+    /// an ancestor gives the label a finite width constraint.
+    pub fn wrap(mut self, enabled: bool) -> Self {
+        self.wrap = enabled;
+        self
+    }
+
     /// Builds the label and adds it to the UI.
     pub fn build(self, cx: &mut BuildCx) -> Component {
         let widget_builder = WidgetBuilder::new()
@@ -74,6 +84,11 @@ impl Label {
                 .with_text(self.text)
                 .with_font(font)
                 .with_font_size(self.font_size.into())
+                .with_wrap(if self.wrap {
+                    WrapMode::Word
+                } else {
+                    WrapMode::NoWrap
+                })
                 .build(&mut ctx)
                 .to_base()
         };
