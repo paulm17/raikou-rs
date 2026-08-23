@@ -39,6 +39,7 @@ const PANELS: &[(&str, PanelFn)] = &[
     ("Radio", panels::radio::radio_panel),
     ("Scroll area", panels::scroll_area::scroll_area_panel),
     ("Select", panels::select::select_panel),
+    ("Slider", panels::slider::slider_panel),
     ("Step input", panels::step_input::step_input_panel),
     ("Switch", panels::switch::switch_panel),
     ("Table", panels::table::table_panel),

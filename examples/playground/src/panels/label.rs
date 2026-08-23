@@ -29,12 +29,18 @@ pub fn label_panel(
 ) -> Handle<UiNode> {
     let mut cx = BuildCx::new(ui, theme, registry);
 
+    // Headline inherits the themed primary text color (no explicit .color()),
+    // matching the snippet below — explicit dark ink would leak in dark mode.
+    let primary = theme
+        .color("text.primary")
+        .unwrap_or(Color::new(0.06, 0.06, 0.07, 1.0));
+
     let preview_content: Handle<UiNode> = Stack::new()
         .spacing(12.0)
         .child(
             Label::new("Launch metrics are trending up")
                 .font_size(28.0)
-                .color(Color::new(0.12, 0.15, 0.20, 1.0))
+                .color(primary)
                 .build(&mut cx),
         )
         .child(

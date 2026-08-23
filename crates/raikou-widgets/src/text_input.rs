@@ -17,6 +17,7 @@ use raikou_core::Thickness;
 
 use crate::build_cx::BuildCx;
 use crate::component::{Component, ComponentKind};
+use crate::convert::to_fyrox_color;
 
 type ChangeCallback = dyn Fn(&mut UserInterface, &str);
 
@@ -126,8 +127,26 @@ impl TextInput {
                     bottom: 5.0,
                 });
             if !placeholder.is_empty() {
+                // Fluent placeholder gray from the theme. The native
+                // `EmptyTextPlaceholder::Text` path styles itself with fyrox's
+                // BRUSH_LIGHTER style property, which the bridge maps to a
+                // near-invisible hover tint — hence an explicit widget here.
+                let muted = theme.color("text.muted").unwrap_or(raikou_core::Color::new(
+                    0.63, 0.62, 0.61, 1.0,
+                ));
+                let node = fyrox::gui::text::TextBuilder::new(
+                    WidgetBuilder::new()
+                        .with_visibility(self.text.is_empty())
+                        .with_foreground(
+                            fyrox::gui::brush::Brush::Solid(to_fyrox_color(muted)).into(),
+                        ),
+                )
+                .with_text(&placeholder)
+                .with_vertical_text_alignment(fyrox::gui::VerticalAlignment::Center)
+                .build(&mut ctx)
+                .to_base();
                 builder =
-                    builder.with_empty_text_placeholder(EmptyTextPlaceholder::Text(&placeholder));
+                    builder.with_empty_text_placeholder(EmptyTextPlaceholder::Widget(node));
             }
             builder.build(&mut ctx).to_base()
         };

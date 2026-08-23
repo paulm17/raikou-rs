@@ -91,6 +91,20 @@ impl ProgressBar {
                 .unwrap_or(Color::new(0.13, 0.39, 0.94, 1.0))
         });
 
+        // fyrox paints its default indicator with Style::BRUSH_BRIGHTEST
+        // (near-black ink here), so supply an explicit fill-colored indicator.
+        let indicator = {
+            use fyrox::gui::border::BorderBuilder;
+            let mut ctx = cx.ctx();
+            BorderBuilder::new(
+                WidgetBuilder::new().with_background(
+                    fyrox::gui::brush::Brush::Solid(to_fyrox_color(fill_color)).into(),
+                ),
+            )
+            .build(&mut ctx)
+            .to_base()
+        };
+
         let handle: Handle<UiNode> = {
             let mut ctx = cx.ctx();
             ProgressBarBuilder::new(
@@ -101,11 +115,9 @@ impl ProgressBar {
                     .with_margin(to_fyrox_thickness(self.margin))
                     .with_background(
                         fyrox::gui::brush::Brush::Solid(to_fyrox_color(track_color)).into(),
-                    )
-                    .with_foreground(
-                        fyrox::gui::brush::Brush::Solid(to_fyrox_color(fill_color)).into(),
                     ),
             )
+            .with_indicator(indicator)
             .with_progress(self.value)
             .build(&mut ctx)
             .to_base()

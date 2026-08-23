@@ -42,6 +42,7 @@ pub struct Table {
     columns: Vec<TableColumn>,
     rows: Vec<Vec<String>>,
     row_height: f32,
+    zebra: bool,
     margin: Thickness,
 }
 
@@ -58,6 +59,7 @@ impl Table {
             columns: Vec::new(),
             rows: Vec::new(),
             row_height: 32.0,
+            zebra: false,
             margin: Thickness::ZERO,
         }
     }
@@ -80,6 +82,13 @@ impl Table {
         self
     }
 
+    /// Toggles alternating row fills. Off by default to match the plain-row
+    /// look of the Avalonia DataGrid reference.
+    pub fn zebra(mut self, zebra: bool) -> Self {
+        self.zebra = zebra;
+        self
+    }
+
     /// Sets the outer margin.
     pub fn margin(mut self, margin: Thickness) -> Self {
         self.margin = margin;
@@ -98,33 +107,48 @@ impl Table {
         let hover_fill =
             to_fyrox_color(theme.color("fluent.list.medium").unwrap_or(fallback_hover));
         let transparent = fyrox::core::color::Color::TRANSPARENT;
+        let header_bg_fallback = raikou_core::Color::new(0.96, 0.96, 0.97, 1.0);
+        let header_bg = to_fyrox_color(theme.color("surface.muted").unwrap_or(header_bg_fallback));
 
         let mut ctx = cx.ctx();
 
         // Header texts live in their own grid so the outer grid can use one
-        // stretch column spanning the full width.
+        // stretch column spanning the full width. A 1px divider column sits
+        // between every pair of columns (Avalonia DataGrid column rules).
         let header_grid: Handle<UiNode> = {
             let mut header_nodes = Vec::new();
             for (col_idx, column) in self.columns.iter().enumerate() {
+                if col_idx > 0 {
+                    let divider = table_divider(&mut ctx, stroke);
+                    header_nodes.push((divider, col_idx * 2 - 1));
+                }
                 let header = fyrox::gui::text::TextBuilder::new(
                     WidgetBuilder::new()
                         .on_row(0)
-                        .on_column(col_idx)
+                        .on_column(col_idx * 2)
                         .with_margin(fyrox::gui::Thickness::uniform(4.0)),
                 )
                 .with_text(&column.header)
                 .with_font(ctx.default_font())
                 .build(&mut ctx);
-                header_nodes.push(header.to_base());
+                header_nodes.push((header.to_base(), col_idx * 2));
             }
+            let nodes = header_nodes.iter().map(|(h, _)| *h);
             let mut builder = GridBuilder::new(
                 WidgetBuilder::new()
                     .with_name("raikou_table_header")
-                    .with_children(header_nodes),
+                    .with_background(Brush::Solid(header_bg).into())
+                    .with_children(nodes),
             )
             .add_row(Row::strict(self.row_height));
-            for column in &self.columns {
+            for (i, column) in self.columns.iter().enumerate() {
+                if i > 0 {
+                    builder = builder.add_column(Column::strict(1.0));
+                }
                 builder = builder.add_column(Column::strict(column.width));
+            }
+            for (node, col) in &header_nodes {
+                ctx[*node].set_row(0).set_column(*col);
             }
             builder.build(&mut ctx).to_base()
         };
@@ -143,31 +167,43 @@ impl Table {
         .to_base();
 
         // Data rows: each row is a full-width Border (wrapped in a Decorator
-        // for hover chrome) containing an inner grid of its cells.
+        // for hover chrome) containing an inner grid of its cells, with 1px
+        // divider columns between cells.
         let mut row_nodes = Vec::new();
         for (row_idx, cells) in self.rows.iter().enumerate() {
-            let mut cell_nodes = Vec::new();
+            let mut cell_nodes: Vec<(Handle<UiNode>, usize)> = Vec::new();
             for (col_idx, cell) in cells.iter().enumerate() {
+                if col_idx > 0 {
+                    let divider = table_divider(&mut ctx, stroke);
+                    cell_nodes.push((divider, col_idx * 2 - 1));
+                }
                 let text = fyrox::gui::text::TextBuilder::new(
                     WidgetBuilder::new()
                         .on_row(0)
-                        .on_column(col_idx)
+                        .on_column(col_idx * 2)
                         .with_margin(fyrox::gui::Thickness::uniform(4.0)),
                 )
                 .with_text(cell)
                 .with_font(ctx.default_font())
                 .build(&mut ctx);
-                cell_nodes.push(text.to_base());
+                cell_nodes.push((text.to_base(), col_idx * 2));
             }
 
-            let mut cell_grid = GridBuilder::new(WidgetBuilder::new().with_children(cell_nodes))
+            let nodes = cell_nodes.iter().map(|(h, _)| *h);
+            let mut cell_grid = GridBuilder::new(WidgetBuilder::new().with_children(nodes))
                 .add_row(Row::strict(self.row_height));
-            for column in &self.columns {
+            for (i, column) in self.columns.iter().enumerate() {
+                if i > 0 {
+                    cell_grid = cell_grid.add_column(Column::strict(1.0));
+                }
                 cell_grid = cell_grid.add_column(Column::strict(column.width));
+            }
+            for (node, col) in &cell_nodes {
+                ctx[*node].set_row(0).set_column(*col);
             }
             let cell_grid: Handle<UiNode> = cell_grid.build(&mut ctx).to_base();
 
-            let normal = if row_idx % 2 == 0 {
+            let normal = if self.zebra && row_idx % 2 == 0 {
                 alt_fill
             } else {
                 transparent
@@ -195,7 +231,6 @@ impl Table {
         let mut grid_builder = GridBuilder::new(
             WidgetBuilder::new()
                 .with_name("raikou_table")
-                .with_margin(to_fyrox_thickness(self.margin))
                 .on_column(0)
                 .with_child(header_grid)
                 .with_child(separator)
@@ -215,7 +250,21 @@ impl Table {
             ctx[*node].set_row(i + 2).set_column(0);
         }
 
-        let handle = grid_builder.build(&mut ctx).to_base();
+        let inner: Handle<UiNode> = grid_builder.build(&mut ctx).to_base();
+
+        // Fluent frame: 1px stroke around the whole grid (Avalonia DataGrid
+        // has a full outer border).
+        let handle = BorderBuilder::new(
+            WidgetBuilder::new()
+                .with_name("raikou_table_frame")
+                .with_margin(to_fyrox_thickness(self.margin))
+                .with_foreground(Brush::Solid(stroke).into())
+                .with_child(inner),
+        )
+        .with_stroke_thickness(fyrox::gui::Thickness::uniform(1.0).into())
+        .with_pad_by_corner_radius(false)
+        .build(&mut ctx)
+        .to_base();
 
         // Static component: no dispatchable handlers (matches reference, which
         // only tracks hover for styling).
@@ -226,6 +275,23 @@ impl Table {
         cx.register(&component);
         component
     }
+}
+
+/// 1px filled vertical divider used between table columns.
+fn table_divider(
+    ctx: &mut fyrox::gui::BuildContext,
+    color: fyrox::core::color::Color,
+) -> Handle<UiNode> {
+    BorderBuilder::new(
+        WidgetBuilder::new()
+            .with_name("raikou_table_divider")
+            .with_background(Brush::Solid(color).into())
+            .with_foreground(Brush::Solid(fyrox::core::color::Color::TRANSPARENT).into()),
+    )
+    .with_stroke_thickness(fyrox::gui::Thickness::uniform(0.0).into())
+    .with_pad_by_corner_radius(false)
+    .build(ctx)
+    .to_base()
 }
 
 /// A handle to a built table.

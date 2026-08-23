@@ -133,18 +133,30 @@ pub fn button_panel(
 
     // --- preview content ---------------------------------------------------
     let defaults = PlaygroundState::default();
-    let preview_button = Button::new()
-        .text(&defaults.label)
-        .variant(match defaults.variant {
+    // RAIKOU_BUTTON_VARIANT=outline: capture a bare Fluent-style default-ish
+    // button (Outline, no playground width/radius overrides) for the audit.
+    let audit_outline = std::env::var("RAIKOU_BUTTON_VARIANT").as_deref() == Ok("outline");
+    let preview_variant = if audit_outline {
+        ButtonVariant::Outline
+    } else {
+        match defaults.variant {
             0 => ButtonVariant::Filled,
             1 => ButtonVariant::Outline,
             2 => ButtonVariant::Ghost,
             3 => ButtonVariant::Subtle,
             _ => ButtonVariant::Link,
-        })
-        .size(control_size(defaults.size))
-        .width(Length::Fixed(defaults.width))
-        .corner_radius(defaults.radius)
+        }
+    };
+    let mut preview_button = Button::new()
+        .text(&defaults.label)
+        .variant(preview_variant)
+        .size(control_size(defaults.size));
+    if !audit_outline {
+        preview_button = preview_button
+            .width(Length::Fixed(defaults.width))
+            .corner_radius(defaults.radius);
+    }
+    let preview_button = preview_button
         .on_click(|ui, _event| {
             let _ = ui;
         })

@@ -24,6 +24,13 @@ type ChangeCallback = dyn Fn(&mut UserInterface, f32);
 pub struct SliderHandlers {
     /// Invoked with the new value whenever the slider moves.
     pub on_change: Option<Rc<ChangeCallback>>,
+    /// Range + layout handles for the Fluent fill-before-thumb element.
+    min: f32,
+    max: f32,
+    body: Handle<UiNode>,
+    fill: Handle<UiNode>,
+    /// Last reported value; dedupes the synthetic initial echo.
+    last_value: std::cell::Cell<f32>,
 }
 
 impl SliderHandlers {
@@ -33,10 +40,30 @@ impl SliderHandlers {
             return;
         }
         if let Some(ScrollBarMessage::Value(value)) = message.data::<ScrollBarMessage>() {
-            if let Some(callback) = &self.on_change {
-                callback(ui, *value);
+            self.sync_fill(ui, *value);
+            if self.last_value.get() != *value {
+                self.last_value.set(*value);
+                if let Some(callback) = &self.on_change {
+                    callback(ui, *value);
+                }
             }
         }
+    }
+
+    /// Sizes the accent fill before the thumb (Fluent slider look).
+    fn sync_fill(&self, ui: &mut UserInterface, value: f32) {
+        use fyrox::graph::SceneGraph;
+
+        if self.fill.is_none() || self.body.is_none() {
+            return;
+        }
+        let span = (self.max - self.min).max(f32::EPSILON);
+        let pct = ((value - self.min) / span).clamp(0.0, 1.0);
+        let track_w = ui.node(self.body).actual_local_size().x;
+        ui.send(
+            self.fill,
+            fyrox::gui::widget::WidgetMessage::Width(pct * track_w),
+        );
     }
 }
 
@@ -138,6 +165,8 @@ impl Slider {
         };
 
         // Fluent restyle: thin track line + round thumb, no arrow buttons.
+        let mut fill_handle = Handle::NONE;
+        let mut body_handle = Handle::NONE;
         {
             use crate::convert::to_fyrox_color;
             use fyrox::gui::border::Border;
@@ -185,29 +214,61 @@ impl Slider {
                 indicator,
                 DecoratorMessage::PressedBrush(Brush::Solid(to_fyrox_color(pressed_fill)).into()),
             );
+            // End the shared `ui` reborrow here: the fill element below needs
+            // fresh `cx.ctx()`/`cx.ui()` calls and NLL keeps the old borrow
+            // alive otherwise.
+            drop(ui);
 
             // Track: thin centered line.
-            if let Some(body) = ui.node(handle).children().first().copied() {
+            let body = cx.ui().node(handle).children().first().copied();
+            if let Some(body) = body {
+                let ui = cx.ui();
                 if let Ok(border) = ui.try_get_mut_of_type::<Border>(body) {
                     *border.stroke_thickness = FyroxThickness::uniform(0.0).into();
                     *border.background = Brush::Solid(to_fyrox_color(track_fill)).into();
                 }
-                match self.orientation {
-                    Orientation::Horizontal => {
-                        ui.send(body, WidgetMessage::Height(4.0));
-                        ui.send(
-                            body,
-                            WidgetMessage::VerticalAlignment(VerticalAlignment::Center),
-                        );
-                    }
-                    Orientation::Vertical => {
-                        ui.send(body, WidgetMessage::Width(4.0));
-                        ui.send(
-                            body,
-                            WidgetMessage::HorizontalAlignment(HorizontalAlignment::Center),
-                        );
-                    }
+                let (alignment_msg, size_msg) = match self.orientation {
+                    Orientation::Horizontal => (
+                        WidgetMessage::VerticalAlignment(VerticalAlignment::Center),
+                        WidgetMessage::Height(4.0),
+                    ),
+                    Orientation::Vertical => (
+                        WidgetMessage::HorizontalAlignment(HorizontalAlignment::Center),
+                        WidgetMessage::Width(4.0),
+                    ),
+                };
+                ui.send(body, size_msg);
+                ui.send(body, alignment_msg.clone());
+                ui.send(indicator, alignment_msg);
+            }
+
+            // Fluent accent fill before the thumb: a child of the track
+            // body, sized proportionally on every value change.
+            if let Some(body) = body {
+                use fyrox::gui::border::BorderBuilder;
+                let fill_accent = token("accent.solid", RaikouColor::new(0.0, 0.47, 0.84, 1.0));
+                let fill = {
+                    let mut ctx = cx.ctx();
+                    BorderBuilder::new(
+                        WidgetBuilder::new()
+                            .with_name("raikou_slider_fill")
+                            .with_vertical_alignment(VerticalAlignment::Center)
+                            .with_horizontal_alignment(HorizontalAlignment::Left)
+                            .with_height(4.0)
+                            .with_width(0.0)
+                            .with_background(Brush::Solid(to_fyrox_color(fill_accent)).into()),
+                    )
+                    .with_corner_radius(2.0.into())
+                    .with_stroke_thickness(FyroxThickness::uniform(0.0).into())
+                    .build(&mut ctx)
+                    .to_base()
+                };
+                {
+                    let mut ctx = cx.ctx();
+                    ctx.link(fill, body);
                 }
+                fill_handle = fill;
+                body_handle = body;
             }
         }
 
@@ -215,9 +276,24 @@ impl Slider {
             handle,
             kind: ComponentKind::Slider(SliderHandlers {
                 on_change: self.on_change,
+                min: self.min,
+                max: self.max,
+                body: body_handle,
+                fill: fill_handle,
+                last_value: std::cell::Cell::new(self.value),
             }),
         };
         cx.register(&component);
+
+        // Size the accent fill for the initial value: a synthetic FromWidget
+        // echo routes through our own dispatcher on the next pump (the
+        // last_value dedupe keeps on_change silent for it).
+        cx.ui().send_message(
+            UiMessage::with_data(ScrollBarMessage::Value(self.value))
+                .with_destination(handle)
+                .with_direction(MessageDirection::FromWidget),
+        );
+
         component
     }
 }

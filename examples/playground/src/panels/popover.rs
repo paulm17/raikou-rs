@@ -91,13 +91,13 @@ pub fn popover_panel(
         .child(
             Label::new("Popover title")
                 .font_size(15.0)
-                .color(Color::new(0.10, 0.12, 0.15, 1.0))
+                .color(theme.color("text.primary").unwrap_or(Color::new(0.10, 0.12, 0.15, 1.0)))
                 .build(&mut cx),
         )
         .child(
             Label::new("Popover body text...")
                 .font_size(13.0)
-                .color(Color::new(0.40, 0.44, 0.50, 1.0))
+                .color(theme.color("text.muted").unwrap_or(Color::new(0.40, 0.44, 0.50, 1.0)))
                 .build(&mut cx),
         )
         .build(&mut cx)
@@ -109,6 +109,14 @@ pub fn popover_panel(
         .build(&mut cx);
     let popover_handle: Handle<UiNode> = popover.into();
     *popover_cell.borrow_mut() = popover_handle;
+
+    // Headless capture hook: RAIKOU_POPOVER_OPEN=1 opens the popover at build
+    // time so shot.sh can capture the open state (the placement resolves on
+    // the first update tick, well before the screenshot fires).
+    if std::env::var("RAIKOU_POPOVER_OPEN").as_deref() == Ok("1") {
+        state.borrow_mut().open = true;
+        show_popover(cx.ui(), popover_handle);
+    }
 
     let preview_content: Handle<UiNode> = Stack::new()
         .spacing(16.0)

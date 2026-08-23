@@ -12,6 +12,7 @@ pub mod progress_bar;
 pub mod radio;
 pub mod scroll_area;
 pub mod select;
+pub mod slider;
 pub mod step_input;
 pub mod switch;
 pub mod table;

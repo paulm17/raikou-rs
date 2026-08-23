@@ -70,5 +70,31 @@ pub fn tree_panel(
     let shell_handle: Handle<UiNode> = shell.into();
     cx.ui().send(shell_handle, WidgetMessage::Width(980.0));
     cx.ui().send(shell_handle, WidgetMessage::Height(760.0));
+
+    // RAIKOU_TREE_SELECT=1: simulate a left-click on the first tree item so
+    // the native selection brush is visible in audit captures.
+    if std::env::var("RAIKOU_TREE_SELECT").as_deref() == Ok("1") {
+        use fyrox::graph::SceneGraph;
+        use fyrox::gui::message::MouseButton;
+
+        let mut stack = vec![ui.root()];
+        while let Some(h) = stack.pop() {
+            if h.is_none() {
+                continue;
+            }
+            if ui.try_get_of_type::<fyrox::gui::tree::Tree>(h).is_ok() {
+                ui.send(
+                    h,
+                    WidgetMessage::MouseDown {
+                        pos: Default::default(),
+                        button: MouseButton::Left,
+                    },
+                );
+                break;
+            }
+            stack.extend(ui.node(h).children().iter().copied());
+        }
+    }
+
     shell_handle
 }
